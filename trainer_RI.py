@@ -311,15 +311,6 @@ class PITrainer_RI(object):
                             'loss' : valid_loss_src
                             },
                             save_path)
-                if epoch % 10 == 0:
-                    on_test_start = time.time()
-                    test_loss_src, test_num_batch = self.test(test_set)
-                    on_test_end = time.time()
-                    logger.info(
-                        "Loss(time/mini-batch) \n - Epoch {:2d}: test for source = {:.4f} for freq and {:.4f} for time ({:.2f}s/{:d})"
-                        .format(epoch, test_loss_src_freq, test_loss_src_time, on_test_start - on_test_end, test_num_batch)
-                        )
-
 
         logger.info("Training for {} epoches done!".format(num_epoches))
 
