@@ -202,16 +202,10 @@ class PITrainer(object):
             target_attr["spectrogram"], target_attr["phase"] = [self.stft(t.to(self.device)) for t in target]
             noise_attr["spectrogram"], noise_attr["phase"] = self.stft(noise.to(self.device))
             mix_feat = apply_cmvn(mix_STFT) if self.mvn else mix_STFT
-            if self.crm:
-                mix_feat = th.cat([th.real(mix_feat), th.imag(mix_feat)],dim=-1)
-            else:
-                mix_feat = th.cat([th.real(mix_feat), th.imag(mix_feat)],dim=-1)
-                # mix_feat = th.abs(mix_feat)
+            mix_feat = th.abs(mix_feat)
             if self.apply_log: mix_feat = th.log(th.clamp(mix_feat, min=1.0e-6))
-
         nnet_input = packed_sequence_cuda(mix_feat, self.device) if isinstance(
             mix_feat, PackedSequence) else mix_feat.to(self.device)  
-
         return input_sizes, source_attr, target_attr, noise_attr, nnet_input
 
     def train(self, dataset, epoch):
@@ -250,7 +244,7 @@ class PITrainer(object):
                 th.nn.utils.clip_grad_norm_(self.nnet.parameters(),
                                             self.clip_norm)
             self.optimizer.step()
-            # th.cuda.empty_cache() # personal edit
+            pbar.set_postfix({'Loss': tot_loss_s/num_batch, 'Loss_n': tot_loss_n/num_batch})
         pbar.close()
         return tot_loss_s / num_batch, num_batch
 
@@ -258,7 +252,7 @@ class PITrainer(object):
     def validate(self, dataset):
         self.nnet.eval()
         logger.info("Cross Validate...")
-        tot_loss_s = tot_loss_n = num_batch = 0
+        tot_pesq_in = tot_pesq_out = tot_loss_s = tot_loss_n = num_batch = 0
         # do not need to keep gradient
         pbar = tqdm(total=len(dataset), unit='batches', bar_format='{l_bar}{bar:20}{r_bar}{bar:-10b}', colour="RED", dynamic_ncols=True)
         with th.no_grad():
@@ -275,6 +269,7 @@ class PITrainer(object):
                 cur_loss_s = self.PIT_loss_spec(masks[:self.num_spks], input_sizes, source_attr, target_attr)
                 tot_loss_s += cur_loss_s.item() / self.num_spks
                 # th.cuda.empty_cache() # personal edit
+                pbar.set_postfix({'Loss': tot_loss_s/num_batch, 'Loss_n': tot_loss_n/num_batch, 'pesq_in': tot_pesq_in/num_batch, 'pesq_out': tot_pesq_out/num_batch})
         pbar.close()
         
         return tot_loss_s / num_batch, num_batch
