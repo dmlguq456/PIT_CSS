@@ -8,7 +8,7 @@ from trainer import PITrainer
 from tester import PITester
 from dataset_RI import SpectrogramReader, Datasets
 
-from conformer import ConformerCSS
+from model.conformer import ConformerCSS
 
 
 from utils import nfft, parse_yaml, get_logger

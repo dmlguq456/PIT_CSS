@@ -8,8 +8,8 @@ from tester_RI import PITester_RI
 from trainer_RI_NBF import PITrainer_RI_NBF
 from dataset_RI import SpectrogramReader, Datasets
 
-from DPMCN_v15 import DPMCN_v15
-from DPMCN_v15_NBF import DPMCN_v15_NBF
+from model.DPMCN_v15 import DPMCN_v15
+from model.DPMCN_v15_NBF import DPMCN_v15_NBF
 
 from utils import nfft, parse_yaml, get_logger
 from torch.utils.data import DataLoader
