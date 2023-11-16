@@ -203,8 +203,8 @@ class PITester_RI(object):
         # do not need to keep gradient
         pbar = tqdm(total=len(dataset), unit='batches', bar_format='{l_bar}{bar:20}{r_bar}{bar:-10b}', colour="white", dynamic_ncols=True)
         with th.no_grad():
-            for input_sizes, mixture, target_rir, target, noise, degs_diff, DOAs in dataset:
-                extracted_feature = self.extractor(input_sizes, mixture, target_rir, target, noise, degs_diff, DOAs)
+            for input_sizes, mixture, target_rir, target, noise in dataset:
+                extracted_feature = self.extractor(input_sizes, mixture, target_rir, target, noise)
                 input_sizes, source_attr, target_attr, noise_attr, nnet_input = extracted_feature
                 # input_sizes, source_attr, target_attr, noise_attr, nnet_input, angle_diff, AF = extracted_feature
 
