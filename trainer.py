@@ -244,7 +244,7 @@ class PITrainer(object):
                 th.nn.utils.clip_grad_norm_(self.nnet.parameters(),
                                             self.clip_norm)
             self.optimizer.step()
-            # th.cuda.empty_cache() # personal edit
+            pbar.set_postfix({'Loss': tot_loss_s/num_batch, 'Loss_n': tot_loss_n/num_batch})
         pbar.close()
         return tot_loss_s / num_batch, num_batch
 
@@ -252,7 +252,7 @@ class PITrainer(object):
     def validate(self, dataset):
         self.nnet.eval()
         logger.info("Cross Validate...")
-        tot_loss_s = tot_loss_n = num_batch = 0
+        tot_pesq_in = tot_pesq_out = tot_loss_s = tot_loss_n = num_batch = 0
         # do not need to keep gradient
         pbar = tqdm(total=len(dataset), unit='batches', bar_format='{l_bar}{bar:20}{r_bar}{bar:-10b}', colour="RED", dynamic_ncols=True)
         with th.no_grad():
@@ -269,6 +269,7 @@ class PITrainer(object):
                 cur_loss_s = self.PIT_loss_spec(masks[:self.num_spks], input_sizes, source_attr, target_attr)
                 tot_loss_s += cur_loss_s.item() / self.num_spks
                 # th.cuda.empty_cache() # personal edit
+                pbar.set_postfix({'Loss': tot_loss_s/num_batch, 'Loss_n': tot_loss_n/num_batch, 'pesq_in': tot_pesq_in/num_batch, 'pesq_out': tot_pesq_out/num_batch})
         pbar.close()
         
         return tot_loss_s / num_batch, num_batch
