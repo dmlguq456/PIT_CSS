@@ -136,7 +136,7 @@ def parse_yaml(yaml_conf):
         raise FileNotFoundError(
             "Could not find configure files...{}".format(yaml_conf))
     with open(yaml_conf, 'r') as f:
-        config_dict = yaml.fullload(f)
+        config_dict = yaml.full_load(f)
 
     # for key in config_keys:
     #     if key not in config_dict:
