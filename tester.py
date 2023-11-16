@@ -170,7 +170,7 @@ class PITester(object):
         # self.rir_dir = rir_config["rir_dir"]
         # self.batch_rir_mix = RIR_mixer(self.gpuid,**rir_config, num_spks=self.num_spks)
 
-    def extractor(self, input_sizes, mixture, target_rir, target, noise, degs_diff, DOAs):
+    def extractor(self, input_sizes, mixture, target_rir, target, noise):
         
         input_sizes = th.floor(input_sizes/self.stft_config["frame_shift"] - 1)
         source_attr = {}
