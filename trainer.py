@@ -19,6 +19,7 @@ import librosa as audio_lib
 import math
 from collections.abc import Sequence
 
+
 def create_optimizer(optimizer, params, **kwargs):
     supported_optimizer = {
         'sgd': th.optim.SGD,  # momentum, weight_decay, lr
@@ -199,7 +200,10 @@ class PITrainer(object):
             source_attr["spectrogram"], source_attr["phase"] = self.stft(mixture.to(self.device))
             mix_STFT = self.stft(mixture.to(self.device))
             mix_STFT = tr(convert_complex(mix_STFT[0],mix_STFT[1]),1,2)
-            target_attr["spectrogram"], target_attr["phase"] = [self.stft(t.to(self.device)) for t in target]
+            for t in target:
+                tmp = self.stft(t.to(self.device))
+                target_attr["spectrogram"].append(tmp[0])
+                target_attr["phase"].append(tmp[1])
             noise_attr["spectrogram"], noise_attr["phase"] = self.stft(noise.to(self.device))
             mix_feat = apply_cmvn(mix_STFT) if self.mvn else mix_STFT
             mix_feat = th.abs(mix_feat)
@@ -314,8 +318,6 @@ class PITrainer(object):
                             'loss' : valid_loss_src
                             },
                             save_path)
-                    if epoch % 10 == 0:
-                        test_loss_src, test_num_batch = self.test(test_set)
                         
                     
         logger.info("Training for {} epoches done!".format(num_epoches))

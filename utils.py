@@ -37,7 +37,6 @@ def stft(samps,
     #     raise TypeError("the number of input channel does not match to configuration yaml")
     stft_mat = audio_lib.stft(
         samps,
-        nfft(frame_length),
         frame_shift,
         frame_length,
         window=window,
