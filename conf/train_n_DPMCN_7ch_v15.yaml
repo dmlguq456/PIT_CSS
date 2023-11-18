@@ -1,7 +1,7 @@
 # config for training
 
 trainer:
-  checkpoint: "./model_pickle/DPMCN/7ch_v15_beta_vec"
+  checkpoint: "./model_pickle/DPMCN/7ch_v15_beta_vec_d_norm"
   # checkpoint: "./model_pickle/DPMCN/7ch_v15"
   # checkpoint: "./model_pickle/UConformer_PIT/7ch_v16_SASDR_IPD_Large_Libri"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v60_SISNR_SA_sincosIPD"
@@ -26,7 +26,7 @@ MVDR: false
 model_type: "DPMCN_v15"
 
 rir_conf:
-  RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]
+  RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
   rir_dir: "./RIR_filter_v9"
 # noise_dir: "/home/nas/user/Uihyeop/DB/wsj0-mix/2speakers/wav16k/colorednoise_v9/"
 noise_dir: "/home/work/data_Uihyeop/data/colorednoise_v9_short/"
@@ -90,7 +90,7 @@ test_scp_conf:
 
 dataloader:
   shuffle: true
-  batch_size: 6
+  batch_size: 8
   drop_last: false
   num_workers: 1
   max_frame : 700
