@@ -141,8 +141,8 @@ class SpectrogramReader(object):
                 h_d[i][0:idx+64] = h[i][0:idx+64,0]
             else:
                 # h_d[i][0:idx+1024] = h[i][0:idx+1024,0]
-                h_d[i][0:idx+64] = h[i][0:idx+64,0]
-                h_d_2[i][0:idx+64] = h[i][0:idx+64,0]
+                h_d[i][0:idx+32] = h[i][0:idx+32,0]
+                h_d_2[i][0:idx+32] = h[i][0:idx+32,0]
                 # h_d[i][0:idx+512] = h[i][0:idx+512,0]
                 # h_d_2[i][0:idx+512] = h[i][0:idx+512,0]
 
@@ -179,8 +179,8 @@ class SpectrogramReader(object):
         # # ! amplification of input mixture to be masked
         samps_rir_mix = samps_rir_mix*sigma
         samps_src_rir = [src*sigma for src in samps_src_rir]
-        samps_src_rir_d = [src*sigma for src in samps_src_rir_d]
-        samps_src_rir_d_2 = [src*sigma for src in samps_src_rir_d_2]
+        samps_src_rir_d = [src*sigma*(np.std(h[idx])/np.std(h_d[idx])) for idx, src in enumerate(samps_src_rir_d)]
+        samps_src_rir_d_2 = [src*sigma*(np.std(h[idx])/np.std(h_d[idx])) for idx, src in enumerate(samps_src_rir_d_2)]
         SNR = random.uniform(0,20)
         norm_tmp = (np.std(samps_rir_mix) + 1.0e-6)/(np.std(noise) + 1.0e-6)
         if self.num_mics == 1:
