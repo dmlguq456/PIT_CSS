@@ -2,7 +2,7 @@
 
 
 trainer:
-  checkpoint: "./model_pickle/Conformer_PIT_re2/mono_v74_SASDR_sigmoid_early64"
+  checkpoint: "./model_pickle/Conformer_PIT_re2/mono_d"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v82_SASDR_IPD"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v60_SISNR_SA_sincosIPD"
   optimizer: "adamW"
@@ -25,10 +25,11 @@ model_type: "Conformer"
 
 # rir_conf:
 rir_conf:
-  RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]
+  RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
   rir_dir: "./RIR_filter_v9"
 
-noise_dir: "/home/work/data_Uihyeop/data/colorednoise_v9_short/"
+noise_dir: "/home/Uihyeop/colorednoise_v9_short/"
+# noise_dir: "/home/nas/user/Uihyeop/DB/wsj0-mix/2speakers/wav16k/colorednoise_v9_short/"
 
   # room_conf: ["medium", "small"]
 crm : false
@@ -70,24 +71,24 @@ spectrogram_reader:
 #   spk2: "scp_librimix_css_v1_segment/cv_s2.scp"
 
 train_scp_conf:
-  mixture: "scp_css_v3_segment/tr_mix.scp"
-  spk1: "scp_css_v3_segment/tr_s1.scp"
-  spk2: "scp_css_v3_segment/tr_s2.scp"
+  mixture: "scp/scp_css_v3_segment/tr_mix.scp"
+  spk1: "scp/scp_css_v3_segment/tr_s1.scp"
+  spk2: "scp/scp_css_v3_segment/tr_s2.scp"
 
 valid_scp_conf:
-  mixture: "scp_css_v3_segment/cv_mix.scp"
-  spk1: "scp_css_v3_segment/cv_s1.scp"
-  spk2: "scp_css_v3_segment/cv_s2.scp"
+  mixture: "scp/scp_css_v3_segment/cv_mix.scp"
+  spk1: "scp/scp_css_v3_segment/cv_s1.scp"
+  spk2: "scp/scp_css_v3_segment/cv_s2.scp"
 
 test_scp_conf:
-  mixture: "scp_css_v3_segment/tt_mix.scp"
-  spk1: "scp_css_v3_segment/tt_s1.scp"
-  spk2: "scp_css_v3_segment/tt_s2.scp"
+  mixture: "scp/scp_css_v3_segment/tt_mix.scp"
+  spk1: "scp/scp_css_v3_segment/tt_s1.scp"
+  spk2: "scp/scp_css_v3_segment/tt_s2.scp"
 
 
 dataloader:
   shuffle: true
-  batch_size: 6
+  batch_size: 10
   drop_last: false
   num_workers: 5
   max_frame : 700
