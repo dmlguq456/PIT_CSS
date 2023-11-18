@@ -7,3 +7,7 @@ scp_css_v3_segment
 scp_librimix_css_v1
 scp_librimix_css_v1_segment
 tmp
+RIR_filter_v9
+*.scp
+*.pyc
+*.swp
