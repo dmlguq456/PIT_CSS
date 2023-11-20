@@ -23,13 +23,13 @@ Base block is **Conformer**.
 ### Conventional Model (Concat. of Magnitude & IPD)
 
 ```bash
-python run_pit.py --config ./conf/train_n_Conformer_7ch.yaml
+python run_pit.py --config ./conf/train_n_Conformer_7ch.yaml --gpus "0"
 ```
 
 ### Proposed DPMCN
 
 ```bash
-python run_pit.py --config ./conf/train_n_Conformer_7ch.yaml
+python run_pit.py --config ./conf/train_n_Conformer_7ch.yaml --gpus "0"
 ```
 
 ## Inference
