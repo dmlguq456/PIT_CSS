@@ -1,0 +1,26 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Python: Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args" : ["--config",
+					"./conf/train_n_DPMCN_7ch_v15.yaml",
+					"--wave_scp",
+					"./scp/LibriCSS_scp/LibriCSS_mix_7ch_utterance_rev.scp",
+					"--cuda",
+					"--dump-dir"
+					"~/nas_Uihyeop/DB/LibriCSS_conformer/LibriCSS_DPMCN_v15/phat_beta_ep112_SMLR",
+					"--gpu-id",
+					"1"
+			]
+		}
+	]
+}
