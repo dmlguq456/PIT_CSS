@@ -488,8 +488,8 @@ class DPConformer(nn.Module):
                  ):
         super(DPConformer, self).__init__()
 
-        self.exponent = nn.Parameter(torch.ones(idim,1), requires_grad=True)
-        # self.exponent = nn.Parameter(torch.tensor(0.0), requires_grad=True)
+        # self.exponent = nn.Parameter(torch.ones(idim,1), requires_grad=True)
+        self.exponent = nn.Parameter(torch.tensor(0.0), requires_grad=True)
         self.IPD_factor = nn.Parameter(torch.ones(idim,1), requires_grad=True)
         self.sigmoid  = torch.nn.Sigmoid()
         self.embed_inter1 = torch.nn.Sequential(
@@ -694,7 +694,7 @@ class DPMCN_v15(nn.Module):
         # f = f.transpose(1, 2)
 
         # global feature normalization
-        if len(f.shape) == 2:
+        if len(f.shape) == 3:
             f = f.unsqueeze(0)
         m = self.conformer(f, masks=None)
 
