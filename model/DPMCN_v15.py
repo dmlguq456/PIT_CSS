@@ -556,7 +556,6 @@ class DPConformer(nn.Module):
         xs = self.get_scm(x_r.permute(0, 3, 2, 1), x_i.permute(0, 3, 2, 1)) # [B, T, 257, M*M]
         xs_abs = xs.abs()
         beta_phat = torch.pow(xs_abs,self.sigmoid(self.exponent))
-        print(self.sigmoid(self.exponent))
         xs_abs = xs_abs / beta_phat
         xs_angle = xs.angle() * self.sigmoid(self.IPD_factor)
         
