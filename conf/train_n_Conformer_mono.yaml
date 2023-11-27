@@ -2,11 +2,7 @@
 
 
 trainer:
-<<<<<<< HEAD
-  checkpoint: "./model_pickle/Conformer_PIT_re2/mono_d"
-=======
   checkpoint: "./model_pickle/Conformer_PIT_re3/mono_d"
->>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v82_SASDR_IPD"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v60_SISNR_SA_sincosIPD"
   optimizer: "adamW"
@@ -33,6 +29,7 @@ rir_conf:
   rir_dir: "./RIR_filter_v9"
 
 noise_dir: "/home/Uihyeop/colorednoise_v9_short/"
+# noise_dir: "/home/Uihyeop/data_Uihyeop/colorednoise_v9_short/"
 # noise_dir: "/home/nas/user/Uihyeop/DB/wsj0-mix/2speakers/wav16k/colorednoise_v9_short/"
 
   # room_conf: ["medium", "small"]
@@ -97,8 +94,6 @@ dataloader:
   num_workers: 5
   max_frame : 700
 
-<<<<<<< HEAD
-=======
 
 inference:
   check_point_dir: "./model_pickle/Conformer_PIT_re3/mono_d/epoch.75.pkl"
@@ -112,4 +107,3 @@ inference:
     N_h: 1.2
     N_c: 0.8
     N_f: 0.4
->>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
