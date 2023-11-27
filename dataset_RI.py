@@ -91,10 +91,10 @@ class SpectrogramReader(object):
             if self.rir_mode == 0:
                 while deg in degs:
                     deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
-                    deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
+                    deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else degs[0] - deg_delta
             else:
                 deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
-                deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
+                deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else degs[0] - deg_delta
             degs.append(deg)
 
 
