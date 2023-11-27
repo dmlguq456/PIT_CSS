@@ -87,15 +87,15 @@ class SpectrogramReader(object):
         #     if i > 0: degs_diff.append(np.mod(abs(degs[0]-deg)*unit_deg, math.pi) )
         deg = random.randint(0,num_deg-1)
         degs.append(deg)
-            for i in range(len(self.wave_dict)-1):
-                if self.rir_mode == 0:
-                    while deg in degs:
-                        deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
-                        deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
-                else:
+        for i in range(len(self.wave_dict)-1):
+            if self.rir_mode == 0:
+                while deg in degs:
                     deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
                     deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
-                degs.append(deg)
+            else:
+                deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
+                deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
+            degs.append(deg)
 
 
         ## Choose distances for targets
