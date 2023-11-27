@@ -35,12 +35,12 @@ class SpectrogramReader(object):
         if self.rir_mode > 0:
             """
             RIR mode = 0 : random
-            RIR mode = 1 : fixed + 10~30
+            RIR mode = 1 : fixed + 0~20
             RIR mode = 2 : fixed + 30~90
-            RIR mode = 3 : fixed + 90~180           
+            RIR mode = 3 : fixed + 100~180           
             """
             random.seed(0)
-        self.rir_range = (1,18) if rir_mode == 0 else (1,3) if rir_mode == 1 else (3,9) if rir_mode == 2 else (9,18) if rir_mode == 3 else 0
+        self.rir_range = (1,18) if rir_mode == 0 else (0,2) if rir_mode == 1 else (3,9) if rir_mode == 2 else (10,18)
         self.RT_list = rir_list[1]
         self.noise_dir = noise_dir
         self.loss = loss
@@ -87,17 +87,14 @@ class SpectrogramReader(object):
         #     if i > 0: degs_diff.append(np.mod(abs(degs[0]-deg)*unit_deg, math.pi) )
         deg = random.randint(0,num_deg-1)
         degs.append(deg)
-        if self.rir_range == 0:
             for i in range(len(self.wave_dict)-1):
-                degs.append(deg)
-        else:
-            for i in range(len(self.wave_dict)-1):
-                while deg in degs:
+                if self.rir_mode == 0:
+                    while deg in degs:
+                        deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
+                        deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
+                else:
                     deg_delta = random.randint(self.rir_range[0],self.rir_range[1])
-                    if random.random() > 0.5: 
-                        deg = (degs[0] + deg_delta)%num_deg
-                    else:
-                        deg = degs[0] - deg_delta
+                    deg = (degs[0] + deg_delta)%num_deg if random.random() > 0.5 else deg = degs[0] - deg_delta
                 degs.append(deg)
 
 
@@ -194,7 +191,7 @@ class SpectrogramReader(object):
 
     '''
     # sequential index
-    def __iter__(self):
+    def __iter__(self):d
         for key in self.wave_dict:
             yield key, self._load(key)
     '''

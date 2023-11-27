@@ -103,7 +103,7 @@ def train(args):
 
     loader_conf["crm"] = config_dict['crm']
 
-    if args.test_mode:
+    if args.test_mode > 0:
         test_loader = uttloader(
             config_dict["valid_scp_conf"],
             config_dict["noise_dir"],
@@ -112,7 +112,7 @@ def train(args):
             [h, RT_list],
             dcnnet_conf["num_mics"],
             config_dict["trainer"]["loss"],
-            rir_mode=1, 
+            rir_mode=args.test_mode, 
             train=False)    
     else:
         train_loader = uttloader(
@@ -179,10 +179,10 @@ if __name__ == '__main__':
         help="Location of .yaml configure files for training")
     parser.add_argument(
         "--test-mode",
-        default=False,
-        action="store_true",
+        type=str,
+        default=0,
         dest="test_mode",
-        help="If true, start testing")
+        help="If non_negative, start testing")
     parser.add_argument(
         "--num-epoches",
         type=int,

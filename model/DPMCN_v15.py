@@ -374,7 +374,7 @@ class Dual_inter_block(nn.Module):
 
 class Dual_Path_Layer(nn.Module):
 
-    def __init__(self, d_model_F, d_model_C, n_head_F, n_head_C, d_ffn_F, d_ffn_C, kernel_size, dropout_rate, causal=False, N_intra=1, N_inter=1):
+    def __init__(self, d_model_F, d_model_C, n_head_F, n_head_C, d_ffn_F, d_ffn_C, kernel_size, dropout_rate, causal=False, N_intra=1, N_inter=1, GRN_opt=True):
         """Construct an EncoderLayer object."""
         super(Dual_Path_Layer, self).__init__()
 
@@ -384,8 +384,10 @@ class Dual_Path_Layer(nn.Module):
         self.inter_block = nn.Sequential(
             *[Dual_inter_block(d_model_C, n_head_C, d_ffn_C, kernel_size, dropout_rate, causal=causal) for _ in range(N_inter)]
             )
-        self.GRN_C = GRN(d_model_C)
-        self.GRN_F = GRN(d_model_F)
+        self.GRN_opt = GRN_opt
+        if GRN_opt:
+            self.GRN_C = GRN(d_model_C)
+            self.GRN_F = GRN(d_model_F)
 
     def forward(self, x, mask):
 
@@ -393,7 +395,8 @@ class Dual_Path_Layer(nn.Module):
         x_intra = x
         
         x_intra = x_intra.permute(0, 1, 3, 2).contiguous()
-        x_intra = self.GRN_C(x_intra)
+        if self.GRN_opt:
+            x_intra = self.GRN_C(x_intra)
         x_intra = x_intra.view(B*T, F, C).contiguous()
         x_intra = torch.nn.functional.adaptive_avg_pool1d(x_intra, C//4)
         x_intra = x_intra.view(B, T, F, C//4).permute(0, 1, 3, 2).contiguous()
@@ -407,7 +410,8 @@ class Dual_Path_Layer(nn.Module):
         x = x + x_intra
 
         x_inter = x
-        x_inter = self.GRN_F(x_inter)
+        if self.GRN_opt:
+            x_inter = self.GRN_F(x_inter)
         x_inter = x_inter.view(B*T, C, F)
         x_inter = torch.nn.functional.adaptive_avg_pool1d(x_inter, F//4)
         x_inter = x_inter.view(B, T, C, F//4)
@@ -484,12 +488,24 @@ class DPConformer(nn.Module):
                  causal=False,
                  N_intra=1,
                  N_inter=1,
-                 N_repeat=4
+                 N_repeat=4,
+                 GRN_opt=True,
+                 beta='vector'
                  ):
         super(DPConformer, self).__init__()
+        if beta == 'vector':
+            print('vector')
+            self.exponent = nn.Parameter(torch.ones(idim,1), requires_grad=True)
+        elif beta == 'scalar':
+            print('scalar')
+            self.exponent = nn.Parameter(torch.tensor(0.0), requires_grad=True)
+        elif beta == 'fixed_mag':
+            print('fixed to 0.5')
+            self.exponent = nn.Parameter(torch.tensor(0.0), requires_grad=False)
+        elif beta == 'fixed_no':
+            print('no')
+            self.exponent = nn.Parameter(torch.tensor(-1.0e10), requires_grad=False)
 
-        self.exponent = nn.Parameter(torch.ones(idim,1), requires_grad=True)
-        # self.exponent = nn.Parameter(torch.tensor(0.0), requires_grad=True)
         self.IPD_factor = nn.Parameter(torch.ones(idim,1), requires_grad=True)
         self.sigmoid  = torch.nn.Sigmoid()
         self.embed_inter1 = torch.nn.Sequential(
@@ -516,7 +532,7 @@ class DPConformer(nn.Module):
         self.relu = nn.ReLU()
     
         self.DP_conformer = torch.nn.Sequential(
-            *[Dual_Path_Layer(attention_dim_F, attention_dim_C, attention_heads_F, attention_heads_C, linear_units_F, linear_units_C, kernel_size, dropout_rate, causal=causal, N_intra=N_intra, N_inter=N_inter)
+            *[Dual_Path_Layer(attention_dim_F, attention_dim_C, attention_heads_F, attention_heads_C, linear_units_F, linear_units_C, kernel_size, dropout_rate, causal=causal, N_intra=N_intra, N_inter=N_inter, GRN_opt=GRN_opt)
             for _ in range(N_repeat)]
             )
         self.num_spk = num_spk
@@ -540,6 +556,7 @@ class DPConformer(nn.Module):
         xs = self.get_scm(x_r.permute(0, 3, 2, 1), x_i.permute(0, 3, 2, 1)) # [B, T, 257, M*M]
         xs_abs = xs.abs()
         beta_phat = torch.pow(xs_abs,self.sigmoid(self.exponent))
+        print(self.sigmoid(self.exponent))
         xs_abs = xs_abs / beta_phat
         xs_angle = xs.angle() * self.sigmoid(self.IPD_factor)
         

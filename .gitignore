@@ -11,3 +11,4 @@ RIR_filter_v9
 *.scp
 *.pyc
 *.swp
+*.mat
