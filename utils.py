@@ -37,8 +37,14 @@ def stft(samps,
     #     raise TypeError("the number of input channel does not match to configuration yaml")
     stft_mat = audio_lib.stft(
         samps,
+<<<<<<< HEAD
         frame_shift,
         frame_length,
+=======
+        n_fft=nfft(frame_length),
+        hop_length=frame_shift,
+        win_length=frame_length,
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
         window=window,
         center=center)
     if apply_pow:
@@ -50,8 +56,12 @@ def stft(samps,
     return stft_mat if not return_samps else (samps, stft_mat)
 
 
+<<<<<<< HEAD
 def istft(file,
           stft_mat,
+=======
+def istft(stft_mat,
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
           frame_length=1024,
           frame_shift=256,
           center=False,
@@ -64,8 +74,13 @@ def istft(file,
         stft_mat = np.transpose(stft_mat)
     samps = audio_lib.istft(
         stft_mat,
+<<<<<<< HEAD
         frame_shift,
         frame_length,
+=======
+        hop_length=frame_shift,
+        win_length=frame_length,
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
         window=window,
         center=center,
         length=nsamps)
@@ -74,6 +89,7 @@ def istft(file,
         samps_norm = np.linalg.norm(samps, np.inf)
         samps = samps * norm / samps_norm
     # same as MATLAB and kaldi
+<<<<<<< HEAD
     samps_int16 = (samps * MAX_INT16).astype(np.int16)
 
     fdir = os.path.dirname(file)
@@ -82,6 +98,17 @@ def istft(file,
     # NOTE: librosa 0.6.0 seems could not write non-float narray
     #       so use scipy.io.wavfile instead
     wf.write(file, fs, samps_int16)
+=======
+    # samps_int16 = (samps * MAX_INT16).astype(np.int16)
+
+    # fdir = os.path.dirname(file)
+    # if fdir and not os.path.exists(fdir):
+    #     os.makedirs(fdir)
+    # NOTE: librosa 0.6.0 seems could not write non-float narray
+    #       so use scipy.io.wavfile instead
+    # wf.write(file, fs, samps_int16)
+    return samps
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
 
 
 def IPD(spec_ref, spec, cos_sin_opt=False):

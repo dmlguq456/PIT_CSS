@@ -52,8 +52,11 @@ model:
     N_intra : 2
     N_inter : 1
     N_repeat : 4
+<<<<<<< HEAD
     GRN_opt: true
     beta : 'vector' # vector, scalar, fixed_mag, fixed_no
+=======
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
 
 spectrogram_reader:
   frame_shift: 256
@@ -92,9 +95,15 @@ test_scp_conf:
 
 dataloader:
   shuffle: true
+<<<<<<< HEAD
   batch_size: 4
   drop_last: false
   num_workers: 5
+=======
+  batch_size: 8
+  drop_last: false
+  num_workers: 1
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
   max_frame : 700
 
 inference:

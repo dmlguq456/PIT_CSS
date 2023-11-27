@@ -2,7 +2,11 @@
 
 
 trainer:
+<<<<<<< HEAD
   checkpoint: "./model_pickle/Conformer_PIT_re2/mono_d"
+=======
+  checkpoint: "./model_pickle/Conformer_PIT_re3/mono_d"
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v82_SASDR_IPD"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v60_SISNR_SA_sincosIPD"
   optimizer: "adamW"
@@ -93,3 +97,19 @@ dataloader:
   num_workers: 5
   max_frame : 700
 
+<<<<<<< HEAD
+=======
+
+inference:
+  check_point_dir: "./model_pickle/Conformer_PIT_re3/mono_d/epoch.75.pkl"
+  save_conf:
+    wav_norm: false
+  CSS_conf:
+    CSS: false
+    # N_h: 3.6
+    # N_c: 2.4
+    # N_f: 1.2
+    N_h: 1.2
+    N_c: 0.8
+    N_f: 0.4
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7

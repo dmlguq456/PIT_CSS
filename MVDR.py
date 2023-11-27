@@ -22,6 +22,10 @@ class MVDR(th.nn.Module):
         self.device = device
         self.diag_eps = diag_eps
         self.mask_threshold = th.nn.Threshold(0.5,1.0e-4)
+<<<<<<< HEAD
+=======
+        self.mask_threshold_n = th.nn.Threshold(0.7,1.0e-4)
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
     def rtf_evd(self, psd_s: Tensor) -> Tensor:
         r"""Estimate the relative transfer function (RTF) or the steering vector by eigenvalue decomposition."""
 
@@ -84,7 +88,12 @@ class MVDR(th.nn.Module):
         steering_vector = self.rtf_evd(tscm)
 
         # MVDR Beamforming
+<<<<<<< HEAD
         nscm = self.get_scm(x, mask=1-mask)
+=======
+        mask_n = self.mask_threshold(1-mask)
+        nscm = self.get_scm(x, mask=mask_n)
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
         w_mvdr = self.mvdr_weights_rtf(steering_vector, nscm)
 
         y = th.einsum("...fc,...cft->...ft", [w_mvdr.conj(), x])

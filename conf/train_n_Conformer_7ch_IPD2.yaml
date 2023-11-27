@@ -2,7 +2,11 @@
 
 
 trainer:
+<<<<<<< HEAD
   checkpoint: "./model_pickle/Conformer_PIT_re2/7ch_v74_SASDR_IPD_sigmoid_early64"
+=======
+  checkpoint: "./model_pickle/Conformer_PIT_re3/7ch_IPD_d"
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v82_SASDR_IPD"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v60_SISNR_SA_sincosIPD"
   optimizer: "adamW"
@@ -25,10 +29,17 @@ model_type: "Conformer"
 
 # rir_conf:
 rir_conf:
+<<<<<<< HEAD
   RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]
   rir_dir: "./RIR_filter_v9"
 
 noise_dir: "/home/work/data_Uihyeop/data/colorednoise_v9_short/"
+=======
+  RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+  rir_dir: "./RIR_filter_v9"
+
+noise_dir: "/home/Uihyeop/colorednoise_v9_short/"
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
 
   # room_conf: ["medium", "small"]
 crm : false
@@ -69,6 +80,7 @@ spectrogram_reader:
 #   spk1: "scp_librimix_css_v1_segment/cv_s1.scp"
 #   spk2: "scp_librimix_css_v1_segment/cv_s2.scp"
 
+<<<<<<< HEAD
 train_scp_conf:
   mixture: "scp_css_v3_segment/tr_mix.scp"
   spk1: "scp_css_v3_segment/tr_s1.scp"
@@ -83,12 +95,50 @@ test_scp_conf:
   mixture: "scp_css_v3_segment/tt_mix.scp"
   spk1: "scp_css_v3_segment/tt_s1.scp"
   spk2: "scp_css_v3_segment/tt_s2.scp"
+=======
+
+train_scp_conf:
+  mixture: "scp/scp_css_v3_segment/tr_mix.scp"
+  spk1: "scp/scp_css_v3_segment/tr_s1.scp"
+  spk2: "scp/scp_css_v3_segment/tr_s2.scp"
+
+valid_scp_conf:
+  mixture: "scp/scp_css_v3_segment/cv_mix.scp"
+  spk1: "scp/scp_css_v3_segment/cv_s1.scp"
+  spk2: "scp/scp_css_v3_segment/cv_s2.scp"
+
+test_scp_conf:
+  mixture: "scp/scp_css_v3_segment/tt_mix.scp"
+  spk1: "scp/scp_css_v3_segment/tt_s1.scp"
+  spk2: "scp/scp_css_v3_segment/tt_s2.scp"
+
+
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
 
 
 dataloader:
   shuffle: true
+<<<<<<< HEAD
   batch_size: 6
+=======
+  batch_size: 10
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
   drop_last: false
   num_workers: 5
   max_frame : 700
 
+<<<<<<< HEAD
+=======
+inference:
+  check_point_dir: "./model_pickle/Conformer_PIT_re3/7ch_IPD_d/epoch.60.pkl"
+  save_conf:
+    wav_norm: false
+  CSS_conf:
+    CSS: false
+    # N_h: 3.6
+    # N_c: 2.4
+    # N_f: 1.2
+    N_h: 1.2
+    N_c: 0.8
+    N_f: 0.4
+>>>>>>> 3fd70388add25ea7793ba02455bbcfe6e9837fb7
