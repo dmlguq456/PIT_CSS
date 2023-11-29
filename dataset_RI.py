@@ -172,12 +172,16 @@ class SpectrogramReader(object):
 
         samps_mix = sum(samps_src)
         samps_rir_mix = sum(samps_src_rir)
-        sigma = (np.std(samps_mix) + 1.0e-10)/(np.std(samps_rir_mix) + 1.0e-10)
+        sigma = (np.std(samps_mix) + 1.0e-6)/(np.std(samps_rir_mix) + 1.0e-6)
         # # ! amplification of input mixture to be masked
         samps_rir_mix = samps_rir_mix*sigma
         samps_src_rir = [src*sigma for src in samps_src_rir]
-        samps_src_rir_d = [src*sigma*(np.std(h[idx])/np.std(h_d[idx])) for idx, src in enumerate(samps_src_rir_d)]
-        samps_src_rir_d_2 = [src*sigma*(np.std(h[idx])/np.std(h_d[idx])) for idx, src in enumerate(samps_src_rir_d_2)]
+        sigam_d = [(np.std(samps_src_rir) + 1.0e-6)/(np.std(samps_src_rir_d[idx]) + 1.0e-6) for idx, src in enumerate(samps_src_rir)]
+        sigam_d_2 = [(np.std(samps_src_rir) + 1.0e-6)/(np.std(samps_src_rir_d_2[idx]) + 1.0e-6) for idx, src in enumerate(samps_src_rir)]
+        samps_src_rir_d = [src*sigam_d[idx] for idx, src in enumerate(samps_src_rir_d)]
+        samps_src_rir_d_2 = [src*sigam_d_2[idx] for idx, src in enumerate(samps_src_rir_d_2)]
+        # samps_src_rir_d = [src*sigma*(np.std(h[idx])/np.std(h_d[idx])) for idx, src in enumerate(samps_src_rir_d)]
+        # samps_src_rir_d_2 = [src*sigma*(np.std(h[idx])/np.std(h_d[idx])) for idx, src in enumerate(samps_src_rir_d_2)]
         SNR = random.uniform(0,20)
         norm_tmp = (np.std(samps_rir_mix) + 1.0e-6)/(np.std(noise) + 1.0e-6)
         if self.num_mics == 1:

@@ -393,17 +393,17 @@ class Dual_Path_Layer(nn.Module):
 
         B, T, C, F = x.shape
         x_intra = x
-        
+        pooling_ratio = 8
         x_intra = x_intra.permute(0, 1, 3, 2).contiguous()
         if self.GRN_opt:
             x_intra = self.GRN_C(x_intra)
         x_intra = x_intra.view(B*T, F, C).contiguous()
-        x_intra = torch.nn.functional.adaptive_avg_pool1d(x_intra, C//4)
-        x_intra = x_intra.view(B, T, F, C//4).permute(0, 1, 3, 2).contiguous()
+        x_intra = torch.nn.functional.adaptive_avg_pool1d(x_intra, C//pooling_ratio)
+        x_intra = x_intra.view(B, T, F, C//pooling_ratio).permute(0, 1, 3, 2).contiguous()
         for layer in self.intra_block:
             x_intra = layer(x_intra, mask)
 
-        x_intra = x_intra.permute(0, 1, 3, 2).contiguous().view(B*T, F, C//4)
+        x_intra = x_intra.permute(0, 1, 3, 2).contiguous().view(B*T, F, C//pooling_ratio)
         x_intra = torch.nn.functional.upsample(x_intra, C)
         x_intra = x_intra.view(B, T, F, C).permute(0, 1, 3, 2).contiguous()
 
@@ -413,13 +413,13 @@ class Dual_Path_Layer(nn.Module):
         if self.GRN_opt:
             x_inter = self.GRN_F(x_inter)
         x_inter = x_inter.view(B*T, C, F)
-        x_inter = torch.nn.functional.adaptive_avg_pool1d(x_inter, F//4)
-        x_inter = x_inter.view(B, T, C, F//4)
+        x_inter = torch.nn.functional.adaptive_avg_pool1d(x_inter, F//pooling_ratio)
+        x_inter = x_inter.view(B, T, C, F//pooling_ratio)
 
         for layer in self.inter_block:
             x_inter = layer(x_inter, mask)
 
-        x_inter = x_inter.view(B*T, C, F//4)
+        x_inter = x_inter.view(B*T, C, F//pooling_ratio)
         x_inter = torch.nn.functional.upsample(x_inter, F)
         x_inter = x_inter.view(B, T, C, F)
         x = x + x_inter
@@ -490,7 +490,8 @@ class DPConformer(nn.Module):
                  N_inter=1,
                  N_repeat=4,
                  GRN_opt=True,
-                 beta='vector'
+                 beta='vector',
+                 mask_activation='ReLU'
                  ):
         super(DPConformer, self).__init__()
         if beta == 'vector':
@@ -541,10 +542,9 @@ class DPConformer(nn.Module):
 
 
         self.mask_estim_ch = torch.nn.Sequential(
-            AttentiveChannelPool(idim, attention_dim_C, 4),
-            torch.nn.Sigmoid()
+            AttentiveChannelPool(idim, attention_dim_C, 4)
         )
-
+        self.mask_activation = nn.ReLU() if mask_activation=='ReLU' else nn.Sigmoid()
 
 
     def forward(self, x, masks):
@@ -610,6 +610,7 @@ class DPConformer(nn.Module):
         #  B, T, F, C --> B, T, F, 1
         # xs = xs.permute(0, 2, 1).contiguous()
         xs = self.mask_estim_ch(xs)
+        xs = self.mask_activation(xs)
         # C = xs.shape[-1]
         xs = xs.view(B, N, T, F).permute(0, 2, 1, 3).contiguous()
         xs = xs.view(B, T, N*F).contiguous()
