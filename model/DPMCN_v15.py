@@ -711,7 +711,7 @@ class DPMCN_v15(nn.Module):
         # f = f.transpose(1, 2)
 
         # global feature normalization
-        if len(f.shape) == 2:
+        if len(f.shape) == 3:
             f = f.unsqueeze(0)
         m = self.conformer(f, masks=None)
 
