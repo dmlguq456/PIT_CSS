@@ -105,7 +105,7 @@ def train(args):
 
     if args.test_mode > 0:
         test_loader = uttloader(
-            config_dict["valid_scp_conf"],
+            config_dict["test_scp_conf"],
             config_dict["noise_dir"],
             reader_conf,
             loader_conf,
@@ -154,7 +154,7 @@ def train(args):
     if "NBF" in config_dict["model_type"]:
         trainer = PITrainer_RI_NBF(nnet, reader_conf, **config_dict["trainer"], gpuid=gpuid)
     else:
-        if args.test_mode:
+        if args.test_mode > 0:
             tester = PITester_RI(nnet, reader_conf, **config_dict["trainer"], gpuid=gpuid)
             tester.run(test_loader, num_epoches=args.num_epoches, log_dir=log_dir)
         else:
