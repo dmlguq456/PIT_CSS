@@ -148,6 +148,10 @@ def train(args):
         nnet = DPMCN_v1(**dcnnet_conf)
     elif config_dict["model_type"] == "DPMCN_v15":
         nnet = DPMCN_v15(**dcnnet_conf)
+    elif config_dict["model_type"] == "DPMCN_v16":
+        nnet = DPMCN_v16(**dcnnet_conf)
+    elif config_dict["model_type"] == "DPMCN_v15_small_embed":
+        nnet = DPMCN_v15_small_embed(**dcnnet_conf)
     elif config_dict["model_type"] == "DPMCN_v15_NBF":
         nnet = DPMCN_v15_NBF(**dcnnet_conf)
 
