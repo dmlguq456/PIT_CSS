@@ -317,8 +317,6 @@ class PITester_RI(object):
                 # s_zm = s - th.mean(s, dim=-1, keepdim=True)
                 # if self.scale_inv: 
                 #     s_zm = th.sum(x_zm * s_zm, dim=-1, keepdim=True) / (l2norm(s_zm, keepdim=True)**2 + eps) * s_zm
-                print(s.shape)
-                print(x.shape)
                 utt_loss = fast_bss_eval.bss_eval_sources(s,x,load_diag=1.0e-5,compute_permutation=False)[0]
                 # utt_loss = 20 * th.log10(eps + l2norm(s_zm) / (l2norm(x_zm - s_zm) + eps))
                 loss_for_permute.append(utt_loss)
