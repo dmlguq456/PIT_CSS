@@ -19,7 +19,8 @@ import librosa as audio_lib
 import math
 from collections.abc import Sequence
 from pesq import pesq_batch
-
+import scipy.io as sio
+import fast_bss_eval
 
 def create_optimizer(optimizer, params, **kwargs):
     supported_optimizer = {
@@ -188,34 +189,24 @@ class PITester(object):
                 target_attr["phase"].append(tmp[1])
             noise_attr["spectrogram"], noise_attr["phase"] = self.stft(noise[:,:,0].to(self.device))
             mix_feat = apply_cmvn(mix_STFT[:,:,:,0]) if self.mvn else mix_STFT[:,:,:,0]
-            if self.crm:
-                mix_feat = th.cat([th.real(mix_feat), th.imag(mix_feat)],dim=-1)
-            else:
-                # mix_feat = th.cat([th.real(mix_feat), th.imag(mix_feat)],dim=-1)
-                mix_feat = th.abs(mix_feat)
+
+            mix_feat = th.abs(mix_feat)
             if self.apply_log: mix_feat = th.log(th.clamp(mix_feat, min=1.0e-6))
             
             for i in range(1,mix_STFT.shape[-1]):
                 ipd = IPD(mix_STFT[:,:,:,0], mix_STFT[:,:,:,i], cos_sin_opt=self.IPD_sincos)
                 mix_feat = th.cat([mix_feat, ipd], dim=-1)
-            angle_diff = degs_diff
-            if self.angle_feature_opt:
-                DOAs = th.stack(DOAs,1).to(self.device)
-                ang = self.ang_extractor(th.angle(tr(mix_STFT,1,3)), DOAs, input_sizes)
-                ang = tr(th.reshape(ang,(ang.size(0),-1,ang.size(-1))),1,2)
-                mix_feat = th.cat([mix_feat,ang],dim=-1)
         else:
             source_attr["spectrogram"], source_attr["phase"] = self.stft(mixture.to(self.device))
             mix_STFT = self.stft(mixture.to(self.device))
             mix_STFT = tr(convert_complex(mix_STFT[0],mix_STFT[1]),1,2)
-            target_attr["spectrogram"], target_attr["phase"] = [self.stft(t.to(self.device)) for t in target]
+            for t in target:
+                tmp = self.stft(t.to(self.device))
+                target_attr["spectrogram"].append(tmp[0])
+                target_attr["phase"].append(tmp[1])
             noise_attr["spectrogram"], noise_attr["phase"] = self.stft(noise.to(self.device))
             mix_feat = apply_cmvn(mix_STFT) if self.mvn else mix_STFT
-            if self.crm:
-                mix_feat = th.cat([th.real(mix_feat), th.imag(mix_feat)],dim=-1)
-            else:
-                mix_feat = th.cat([th.real(mix_feat), th.imag(mix_feat)],dim=-1)
-                # mix_feat = th.abs(mix_feat)
+            mix_feat = th.abs(mix_feat)
             if self.apply_log: mix_feat = th.log(th.clamp(mix_feat, min=1.0e-6))
 
         nnet_input = packed_sequence_cuda(mix_feat, self.device) if isinstance(
@@ -227,7 +218,7 @@ class PITester(object):
     def test(self, dataset):
         self.nnet.eval()
         logger.info("Test...")
-        tot_pesq_in = tot_pesq_out = tot_loss_s = tot_loss_t = tot_loss_n = num_batch = 0
+        tot_pesq_in = tot_pesq_out = tot_loss_in = tot_loss_t = tot_loss_out = num_batch = 0
         # do not need to keep gradient
         pbar = tqdm(total=len(dataset), unit='batches', bar_format='{l_bar}{bar:20}{r_bar}{bar:-10b}', colour="white", dynamic_ncols=True)
         with th.no_grad():
@@ -239,7 +230,6 @@ class PITester(object):
                 num_batch += 1
                 pbar.update(1)
                                 
-                # import scipy.io as sio
                 masks = th.nn.parallel.data_parallel(self.nnet, nnet_input, device_ids=self.gpuid)
                 # sio.savemat("estim_mask_1.mat", {"mask": masks[0].cpu().data.numpy()})
                 # sio.savemat("estim_mask_2.mat", {"mask": masks[1].cpu().data.numpy()})
@@ -269,7 +259,7 @@ class PITester(object):
                 # sio.savemat("IRM_mask_1.mat", {"IRM_mask": mask1.cpu().data.numpy()})
                 # sio.savemat("IRM_mask_2.mat", {"IRM_mask": mask2.cpu().data.numpy()})
 
-                # # IBM
+                # IBM
                 # if True:
                 #     thres = 0.9
                 #     mask1[mask1 > thres] = 1
@@ -283,24 +273,23 @@ class PITester(object):
 
 
                 
-                # cur_loss_s_spec = self.PIT_loss_spec(masks[:self.num_spks], input_sizes, source_attr, target_attr)
-                cur_loss_s_time = self.PIT_loss(masks[:self.num_spks], input_sizes, source_attr, target_attr)
-                cur_loss_s_time_in = self.PIT_loss(None, input_sizes, source_attr, target_attr)
-                # cur_pesq_out = self.PIT_pesq(masks[:self.num_spks], input_sizes, source_attr, target_attr)
-                # tot_pesq_out += cur_pesq_out.item()
-                # cur_pesq_in = self.PIT_pesq(None, input_sizes, source_attr, target_attr)
-                # tot_pesq_in += cur_pesq_in.item()
-                # tot_loss_s += cur_loss_s.item() / self.num_spks
-                tot_loss_t += - (cur_loss_s_time.item() - cur_loss_s_time_in.item()) / self.num_spks
-                if len(masks) != self.num_spks:
-                    cur_loss_n = self.PIT_loss_spec(masks[self.num_spks], input_sizes, source_attr, noise_attr)
-                    tot_loss_n += cur_loss_n.item()
 
-                # th.cuda.empty_cache() # personal edit
-                pbar.set_postfix({'Loss_spec': tot_loss_s/num_batch, 'SDRi_time': tot_loss_t/num_batch, 'pesq_in': tot_pesq_in/num_batch, 'pesq_out': tot_pesq_out/num_batch})
+                
+                cur_loss_in = self.PIT_SDR(None, input_sizes, source_attr, target_attr)
+                tot_loss_in += cur_loss_in.item() / self.num_spks
+                cur_loss_out = self.PIT_SDR(masks[:self.num_spks], input_sizes, source_attr, target_attr)
+                tot_loss_out += cur_loss_out.item() / self.num_spks
+                
+                cur_pesq_in = self.PIT_pesq(None, input_sizes, source_attr, target_attr)
+                tot_pesq_in += cur_pesq_in.item()
+
+                cur_pesq_out = self.PIT_pesq(masks[:self.num_spks], input_sizes, source_attr, target_attr)
+                tot_pesq_out += cur_pesq_out.item()
+                                
+                pbar.set_postfix({'SDR_in': tot_loss_in/num_batch, 'SDR_out': tot_loss_out/num_batch, 'pesq_in': tot_pesq_in/num_batch, 'pesq_out': tot_pesq_out/num_batch})
         pbar.close()
 
-        return tot_loss_t / num_batch, num_batch
+        return tot_loss_in / num_batch, tot_loss_out / num_batch, tot_pesq_in / num_batch, tot_pesq_out / num_batch, num_batch
 
 
 
@@ -309,15 +298,54 @@ class PITester(object):
         with th.cuda.device(self.gpuid[0]):
             writer_src = SummaryWriter(log_dir)
             on_test_start = time.time()
-            test_loss_src, test_num_batch = self.test(test_set)
+            SDR_in, SDR_out, pesq_in, pesq_out, test_num_batch = self.test(test_set)
             on_test_end = time.time()
             logger.info(
-                "Loss(time/mini-batch) \n - Epoch {:2d}: test for source = {:.4f} for freq and {:.4f} for time ({:.2f}s/{:d})"
-                .format(epoch, test_loss_src_freq, test_loss_src_time, on_test_start - on_test_end, test_num_batch)
+                "Loss(time/mini-batch) \n - Epoch {:2d}: test SDR for input = {:.4f} and for output = {:.4f}({:.2f}s/{:d}) \n"
+                "test PESQ for input = {:.4f} and for output = {:.4f}({:.2f}s/{:d})"
+                .format(self.start_epoch, SDR_in, SDR_out, pesq_in, pesq_out, on_test_start - on_test_end, test_num_batch)
                 )
-            raise 
 
         logger.info("Testing done!")
+
+    def PIT_SDR(self, masks, input_sizes, source_attr, target_attr):
+
+        input_sizes = input_sizes.to(self.device)
+        mixture_spect = source_attr["spectrogram"].to(self.device)
+        mixture_phase = source_attr["phase"].to(self.device)
+        targets_spect = [t.to(self.device) for t in target_attr["spectrogram"]]
+        targets_phase = [t.to(self.device) for t in target_attr["phase"]]
+        if self.num_spks != len(targets_spect):
+            raise ValueError(
+                "Number targets do not match known speakers: {} vs {}".format(
+                    self.num_spks, len(targets_spect)))
+
+        def A_SDR_loss(permute, eps=1.0e-6):
+            loss_for_permute = []
+            for s, t in enumerate(permute):
+                if masks == None:
+                    x = self.inverse_stft(mixture_spect, mixture_phase, cplx=False)
+                else:
+                    x = self.inverse_stft(masks[s]*mixture_spect, mixture_phase, cplx=False)                    
+                s = self.inverse_stft(targets_spect[t], targets_phase[t], cplx=False)
+
+                # x_zm = x - th.mean(x, dim=-1, keepdim=True)
+                # s_zm = s - th.mean(s, dim=-1, keepdim=True)
+                # if self.scale_inv: 
+                #     s_zm = th.sum(x_zm * s_zm, dim=-1, keepdim=True) / (l2norm(s_zm, keepdim=True)**2 + eps) * s_zm
+                utt_loss = fast_bss_eval.bss_eval_sources(s,x,load_diag=1.0e-5,compute_permutation=False)[0]
+                # utt_loss = 20 * th.log10(eps + l2norm(s_zm) / (l2norm(x_zm - s_zm) + eps))
+                loss_for_permute.append(utt_loss)
+            return sum(loss_for_permute)
+
+
+        pscore = th.stack( [A_SDR_loss(p) for p in permutations(range(self.num_spks))] )
+        # pscore = th.stack( [(A_SDR_loss(p) if self.loss == 'A_SDR' else SA_SDR_loss(p) if self.loss == 'SA_SDR' else MSE_loss(p)) 
+                            # for p in permutations(range(self.num_spks))] )
+        min_perutt, _ = th.max(pscore, dim=0)
+        # min_perutt = loss()
+        num_utts = input_sizes.shape[0]
+        return th.sum(min_perutt) / num_utts
 
     def PIT_loss(self, masks, input_sizes, source_attr, target_attr):
 

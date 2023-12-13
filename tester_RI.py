@@ -19,6 +19,8 @@ import librosa as audio_lib
 import math
 from collections.abc import Sequence
 from pesq import pesq_batch
+import scipy.io as sio
+import fast_bss_eval
 
 
 def create_optimizer(optimizer, params, **kwargs):
@@ -199,7 +201,7 @@ class PITester_RI(object):
     def test(self, dataset):
         self.nnet.eval()
         logger.info("Test...")
-        tot_pesq_in = tot_pesq_out = tot_loss_s = tot_loss_t = tot_loss_n = num_batch = 0
+        tot_pesq_in = tot_pesq_out = tot_loss_in = tot_loss_t = tot_loss_out = num_batch = 0
         # do not need to keep gradient
         pbar = tqdm(total=len(dataset), unit='batches', bar_format='{l_bar}{bar:20}{r_bar}{bar:-10b}', colour="white", dynamic_ncols=True)
         with th.no_grad():
@@ -211,67 +213,63 @@ class PITester_RI(object):
                 num_batch += 1
                 pbar.update(1)
                                 
-                import scipy.io as sio
-                masks = th.nn.parallel.data_parallel(self.nnet, nnet_input, device_ids=self.gpuid)
-                sio.savemat("estim_mask_1.mat", {"mask": masks[0].cpu().data.numpy()})
-                sio.savemat("estim_mask_2.mat", {"mask": masks[1].cpu().data.numpy()})
+                # masks = th.nn.parallel.data_parallel(self.nnet, nnet_input, device_ids=self.gpuid)
+                # sio.savemat("estim_mask_1.mat", {"mask": masks[0].cpu().data.numpy()})
+                # sio.savemat("estim_mask_2.mat", {"mask": masks[1].cpu().data.numpy()})
                 
-                # IPSM
-                mask1 = th.cos(source_attr["phase"] - target_attr["phase"][0])*target_attr["spectrogram"][0] / (source_attr["spectrogram"] + 1.0e-15)
-                mask2 = th.cos(source_attr["phase"] - target_attr["phase"][1])*target_attr["spectrogram"][1] / (source_attr["spectrogram"] + 1.0e-15)
-                sio.savemat("IPSM_mask_1.mat", {"IPSM_mask": mask1.cpu().data.numpy()})
-                sio.savemat("IPSM_mask_2.mat", {"IPSM_mask": mask2.cpu().data.numpy()})
+                # # IPSM
+                # mask1 = th.cos(source_attr["phase"] - target_attr["phase"][0])*target_attr["spectrogram"][0] / (source_attr["spectrogram"] + 1.0e-15)
+                # mask2 = th.cos(source_attr["phase"] - target_attr["phase"][1])*target_attr["spectrogram"][1] / (source_attr["spectrogram"] + 1.0e-15)
+                # sio.savemat("IPSM_mask_1.mat", {"IPSM_mask": mask1.cpu().data.numpy()})
+                # sio.savemat("IPSM_mask_2.mat", {"IPSM_mask": mask2.cpu().data.numpy()})
                 
-                # WFM
-                denom = target_attr["spectrogram"][0]**2 + target_attr["spectrogram"][1]**2 + noise_attr["spectrogram"]**2  + 1.0e-15
-                mask1 = target_attr["spectrogram"][0]**2 / denom
-                mask2 = target_attr["spectrogram"][1]**2 / denom
-                sio.savemat("WFM_mask_1.mat", {"WFM_mask": mask1.cpu().data.numpy()})
-                sio.savemat("WFM_mask_2.mat", {"WFM_mask": mask2.cpu().data.numpy()})
+                # # WFM
+                # denom = target_attr["spectrogram"][0]**2 + target_attr["spectrogram"][1]**2 + noise_attr["spectrogram"]**2  + 1.0e-15
+                # mask1 = target_attr["spectrogram"][0]**2 / denom
+                # mask2 = target_attr["spectrogram"][1]**2 / denom
+                # sio.savemat("WFM_mask_1.mat", {"WFM_mask": mask1.cpu().data.numpy()})
+                # sio.savemat("WFM_mask_2.mat", {"WFM_mask": mask2.cpu().data.numpy()})
                 
                 # IAM
-                mask1 = target_attr["spectrogram"][0] / (source_attr["spectrogram"] + 1.0e-15)
-                mask2 = target_attr["spectrogram"][1] / (source_attr["spectrogram"] + 1.0e-15)
-                sio.savemat("IAM_mask_1.mat", {"IAM_mask": mask1.cpu().data.numpy()})
-                sio.savemat("IAM_mask_2.mat", {"IAM_mask": mask2.cpu().data.numpy()})
+                # mask1 = target_attr["spectrogram"][0] / (source_attr["spectrogram"] + 1.0e-15)
+                # mask2 = target_attr["spectrogram"][1] / (source_attr["spectrogram"] + 1.0e-15)
+                # sio.savemat("IAM_mask_1.mat", {"IAM_mask": mask1.cpu().data.numpy()})
+                # sio.savemat("IAM_mask_2.mat", {"IAM_mask": mask2.cpu().data.numpy()})
                 
-                # IRM                
+                # # IRM                
                 mask1 = target_attr["spectrogram"][0] / (sum(target_attr["spectrogram"]) + noise_attr["spectrogram"] + 1.0e-15)
                 mask2 = target_attr["spectrogram"][1] / (sum(target_attr["spectrogram"]) + noise_attr["spectrogram"] + 1.0e-15)
-                sio.savemat("IRM_mask_1.mat", {"IRM_mask": mask1.cpu().data.numpy()})
-                sio.savemat("IRM_mask_2.mat", {"IRM_mask": mask2.cpu().data.numpy()})
+                # sio.savemat("IRM_mask_1.mat", {"IRM_mask": mask1.cpu().data.numpy()})
+                # sio.savemat("IRM_mask_2.mat", {"IRM_mask": mask2.cpu().data.numpy()})
 
-                # IBM
+                # # IBM
                 if True:
-                    thres = 0.9
+                    thres = 0.5
                     mask1[mask1 > thres] = 1
                     mask1[mask1 <= thres] = 1.0e-15
                     mask2[mask2 > thres] = 1
                     mask2[mask2 <= thres] = 1.0e-15
-                sio.savemat("IBM_mask_1.mat", {"IBM_mask": mask1.cpu().data.numpy()})
-                sio.savemat("IBM_mask_2.mat", {"IBM_mask": mask2.cpu().data.numpy()})
+                # sio.savemat("IBM_mask_1.mat", {"IBM_mask": mask1.cpu().data.numpy()})
+                # sio.savemat("IBM_mask_2.mat", {"IBM_mask": mask2.cpu().data.numpy()})
 
-                raise
+                # raise
 
                 masks = [mask1, mask2]
 
 
                 
-                # cur_loss_s_spec = self.PIT_loss_spec(masks[:self.num_spks], input_sizes, source_attr, target_attr)
-                cur_loss_s_time = self.PIT_loss(masks[:self.num_spks], input_sizes, source_attr, target_attr)
-                cur_loss_s_time_in = self.PIT_loss(None, input_sizes, source_attr, target_attr)
+                cur_loss_in = self.PIT_SDR(None, input_sizes, source_attr, target_attr)
+                tot_loss_in += cur_loss_in.item() / self.num_spks
+                cur_loss_out = self.PIT_SDR(masks[:self.num_spks], input_sizes, source_attr, target_attr)
+                tot_loss_out += cur_loss_out.item() / self.num_spks
+                
+                cur_pesq_in = self.PIT_pesq(None, input_sizes, source_attr, target_attr)
+                tot_pesq_in += cur_pesq_in.item()
+
                 cur_pesq_out = self.PIT_pesq(masks[:self.num_spks], input_sizes, source_attr, target_attr)
                 tot_pesq_out += cur_pesq_out.item()
-                # cur_pesq_in = self.PIT_pesq(None, input_sizes, source_attr, target_attr)
-                # tot_pesq_in += cur_pesq_in.item()
-                # tot_loss_s += cur_loss_s.item() / self.num_spks
-                tot_loss_t += - (cur_loss_s_time.item() - cur_loss_s_time_in.item()) / self.num_spks
-                if len(masks) != self.num_spks:
-                    cur_loss_n = self.PIT_loss_spec(masks[self.num_spks], input_sizes, source_attr, noise_attr)
-                    tot_loss_n += cur_loss_n.item()
-
-                # th.cuda.empty_cache() # personal edit
-                pbar.set_postfix({'Loss_spec': tot_loss_s/num_batch, 'SDRi_time': tot_loss_t/num_batch, 'pesq_in': tot_pesq_in/num_batch, 'pesq_out': tot_pesq_out/num_batch})
+                
+                pbar.set_postfix({'SDR_in': tot_loss_in/num_batch, 'SDR_out': tot_loss_out/num_batch, 'pesq_in': tot_pesq_in/num_batch, 'pesq_out': tot_pesq_out/num_batch})
         pbar.close()
 
         return tot_loss_t / num_batch, num_batch
@@ -283,15 +281,57 @@ class PITester_RI(object):
         with th.cuda.device(self.gpuid[0]):
             writer_src = SummaryWriter(log_dir)
             on_test_start = time.time()
-            test_loss_src, test_num_batch = self.test(test_set)
+            SDR_in, SDR_out, pesq_in, pesq_out, test_num_batch = self.test(test_set)
             on_test_end = time.time()
             logger.info(
-                "Loss(time/mini-batch) \n - Epoch {:2d}: test for source = {:.4f} for freq and {:.4f} for time ({:.2f}s/{:d})"
-                .format(epoch, test_loss_src_freq, test_loss_src_time, on_test_start - on_test_end, test_num_batch)
+                "Loss(time/mini-batch) \n - Epoch {:2d}: test SDR for input = {:.4f} and for output = {:.4f}({:.2f}s/{:d}) \n"
+                "test PESQ for input = {:.4f} and for output = {:.4f}({:.2f}s/{:d})"
+                .format(self.start_epoch, SDR_in, SDR_out, pesq_in, pesq_out, on_test_start - on_test_end, test_num_batch)
                 )
-            raise 
 
         logger.info("Testing done!")
+
+
+    def PIT_SDR(self, masks, input_sizes, source_attr, target_attr):
+
+        input_sizes = input_sizes.to(self.device)
+        mixture_spect = source_attr["spectrogram"].to(self.device)
+        mixture_phase = source_attr["phase"].to(self.device)
+        targets_spect = [t.to(self.device) for t in target_attr["spectrogram"]]
+        targets_phase = [t.to(self.device) for t in target_attr["phase"]]
+        if self.num_spks != len(targets_spect):
+            raise ValueError(
+                "Number targets do not match known speakers: {} vs {}".format(
+                    self.num_spks, len(targets_spect)))
+
+        def A_SDR_loss(permute, eps=1.0e-6):
+            loss_for_permute = []
+            for s, t in enumerate(permute):
+                if masks == None:
+                    x = self.inverse_stft(mixture_spect, mixture_phase, cplx=False)
+                else:
+                    x = self.inverse_stft(masks[s]*mixture_spect, mixture_phase, cplx=False)                    
+                s = self.inverse_stft(targets_spect[t], targets_phase[t], cplx=False)
+
+                # x_zm = x - th.mean(x, dim=-1, keepdim=True)
+                # s_zm = s - th.mean(s, dim=-1, keepdim=True)
+                # if self.scale_inv: 
+                #     s_zm = th.sum(x_zm * s_zm, dim=-1, keepdim=True) / (l2norm(s_zm, keepdim=True)**2 + eps) * s_zm
+                print(s.shape)
+                print(x.shape)
+                utt_loss = fast_bss_eval.bss_eval_sources(s,x,load_diag=1.0e-5,compute_permutation=False)[0]
+                # utt_loss = 20 * th.log10(eps + l2norm(s_zm) / (l2norm(x_zm - s_zm) + eps))
+                loss_for_permute.append(utt_loss)
+            return sum(loss_for_permute)
+
+
+        pscore = th.stack( [A_SDR_loss(p) for p in permutations(range(self.num_spks))] )
+        # pscore = th.stack( [(A_SDR_loss(p) if self.loss == 'A_SDR' else SA_SDR_loss(p) if self.loss == 'SA_SDR' else MSE_loss(p)) 
+                            # for p in permutations(range(self.num_spks))] )
+        min_perutt, _ = th.max(pscore, dim=0)
+        # min_perutt = loss()
+        num_utts = input_sizes.shape[0]
+        return th.sum(min_perutt) / num_utts
 
     def PIT_loss(self, masks, input_sizes, source_attr, target_attr):
 
