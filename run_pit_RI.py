@@ -9,6 +9,7 @@ from tester_RI import PITester_RI
 from dataset_RI import SpectrogramReader, Datasets
 
 from model.DPMCN_v15 import DPMCN_v15
+from model.DPMCN_v16 import DPMCN_v16
 # from model.DPMCN_v15_NBF import DPMCN_v15_NBF
 
 from utils import nfft, parse_yaml, get_logger
