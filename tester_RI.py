@@ -15,6 +15,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from stft_util import STFT, iSTFT
 import librosa as audio_lib
 import math
 from collections.abc import Sequence
@@ -213,7 +214,7 @@ class PITester_RI(object):
                 num_batch += 1
                 pbar.update(1)
                                 
-                # masks = th.nn.parallel.data_parallel(self.nnet, nnet_input, device_ids=self.gpuid)
+                masks = th.nn.parallel.data_parallel(self.nnet, nnet_input, device_ids=self.gpuid)
                 # sio.savemat("estim_mask_1.mat", {"mask": masks[0].cpu().data.numpy()})
                 # sio.savemat("estim_mask_2.mat", {"mask": masks[1].cpu().data.numpy()})
                 
@@ -237,24 +238,24 @@ class PITester_RI(object):
                 # sio.savemat("IAM_mask_2.mat", {"IAM_mask": mask2.cpu().data.numpy()})
                 
                 # # IRM                
-                mask1 = target_attr["spectrogram"][0] / (sum(target_attr["spectrogram"]) + noise_attr["spectrogram"] + 1.0e-15)
-                mask2 = target_attr["spectrogram"][1] / (sum(target_attr["spectrogram"]) + noise_attr["spectrogram"] + 1.0e-15)
+                # mask1 = target_attr["spectrogram"][0] / (sum(target_attr["spectrogram"]) + noise_attr["spectrogram"] + 1.0e-15)
+                # mask2 = target_attr["spectrogram"][1] / (sum(target_attr["spectrogram"]) + noise_attr["spectrogram"] + 1.0e-15)
                 # sio.savemat("IRM_mask_1.mat", {"IRM_mask": mask1.cpu().data.numpy()})
                 # sio.savemat("IRM_mask_2.mat", {"IRM_mask": mask2.cpu().data.numpy()})
 
                 # # IBM
-                if True:
-                    thres = 0.5
-                    mask1[mask1 > thres] = 1
-                    mask1[mask1 <= thres] = 1.0e-15
-                    mask2[mask2 > thres] = 1
-                    mask2[mask2 <= thres] = 1.0e-15
+                # if True:
+                #     thres = 0.5
+                #     mask1[mask1 > thres] = 1
+                #     mask1[mask1 <= thres] = 1.0e-15
+                #     mask2[mask2 > thres] = 1
+                #     mask2[mask2 <= thres] = 1.0e-15
                 # sio.savemat("IBM_mask_1.mat", {"IBM_mask": mask1.cpu().data.numpy()})
                 # sio.savemat("IBM_mask_2.mat", {"IBM_mask": mask2.cpu().data.numpy()})
 
                 # raise
 
-                masks = [mask1, mask2]
+                # masks = [mask1, mask2]
 
 
                 
@@ -565,118 +566,6 @@ class STFTBase(th.nn.Module):
                 f"kernel_size={self.K.shape[0]}x{self.K.shape[2]}, " +
                 f"normalize={self.normalize}")
         
-
-class iSTFT(STFTBase):
-    """
-    Inverse Short-time Fourier Transform as a Layer
-    """
-    def __init__(self, *args, **kwargs):
-        super(iSTFT, self).__init__(*args, **kwargs)
-
-    def forward(self, m, p, cplx=False, squeeze=False):
-        """
-        Accept phase & magnitude and output raw waveform
-        args
-            m, p: N x F x T
-        return
-            s: N x S
-        """
-        if p.dim() != m.dim() or p.dim() not in [2, 3]:
-            raise RuntimeError("Expect 2D/3D tensor, but got {:d}D".format(
-                p.dim()))
-        # if F x T, reshape 1 x F x T
-        if p.dim() == 2:
-            p = th.unsqueeze(p, 0)
-            m = th.unsqueeze(m, 0)
-        if cplx:
-            # N x 2F x T
-            c = th.cat([m, p], dim=1)
-        else:
-            r = m * th.cos(p)
-            i = m * th.sin(p)
-            # N x 2F x T
-            c = th.cat([r, i], dim=1)
-        # N x 2F x T
-        s = F.conv_transpose1d(c, self.K, stride=self.stride, padding=0)
-        # N x S
-        s = s.squeeze(1)
-        if squeeze:
-            s = th.squeeze(s)
-        return s
-    
-class STFT(STFTBase):
-    """
-    Short-time Fourier Transform as a Layer
-    """
-    def __init__(self, *args, **kwargs):
-        super(STFT, self).__init__(*args, **kwargs)
-
-    def forward(self, x, cplx=False):
-        """
-        Accept (single or multiple channel) raw waveform and output magnitude and phase
-        args
-            x: input signal, N x C x S or N x S
-        return
-            m: magnitude, N x C x F x T or N x F x T
-            p: phase, N x C x F x T or N x F x T
-        """
-        if x.dim() not in [2, 3]:
-            raise RuntimeError(
-                "{} expect 2D/3D tensor, but got {:d}D signal".format(
-                    self.__name__, x.dim()))
-        # if N x S, reshape N x 1 x S
-        if x.dim() == 2:
-            x = th.unsqueeze(x, 1)
-            # N x 2F x T
-            c = F.conv1d(x, self.K, stride=self.stride, padding=0)
-            # N x F x T
-            r, i = th.chunk(c, 2, dim=1)
-            # if self.conjugate:
-                # to match with science pipeline, we need to do conjugate
-                # i = -i
-        # else reshape NC x 1 x S
-        else:
-            N, C, S = x.shape
-            x = x.reshape(N * C, 1, S)
-            # x = x.view(N * C, 1, S)
-            # NC x 2F x T
-            c = F.conv1d(x, self.K, stride=self.stride, padding=0)
-            # N x C x 2F x T
-            c = c.reshape(N, C, -1, c.shape[-1])
-            # c = c.view(N, C, -1, c.shape[-1])
-            # N x C x F x T
-            r, i = th.chunk(c, 2, dim=2)
-            # if self.conjugate:
-                # to match with science pipeline, we need to do conjugate
-                # i = -i
-        if cplx:
-            return r, i
-        m = (r**2 + i**2)**0.5
-        p = th.atan2(i, r)
-        return m, p
-
-    
-
-def init_kernel(frame_len, frame_hop):
-    # FFT points
-    N = frame_len
-    # window
-    W = th.hann_window(frame_len)
-    if N//4 == frame_hop:
-        const = (2/3)**0.5       
-        W = const*W
-    elif N//2 == frame_hop:
-        W = W**0.5
-    S = 0.5 * (N * N / frame_hop)**0.5
-
-    # K = th.rfft(th.eye(N) / S, 1)[:frame_len]
-    K = th.fft.rfft(th.eye(N) / S, dim=1)[:frame_len]
-    K = th.stack((th.real(K), th.imag(K)),dim=2)
-    # 2 x N/2+1 x F
-    K = th.transpose(K, 0, 2) * W
-    # N+2 x 1 x F
-    K = th.reshape(K, (N + 2, 1, frame_len))
-    return K
 
 
 def convert_complex(m, p):
