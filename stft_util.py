@@ -112,7 +112,7 @@ class STFT(STFTBase):
             x = x.reshape(N * C, 1, S)
             # x = x.view(N * C, 1, S)
             # NC x 2F x T
-            c = F.conv1d(x, self.K, stride=self.stride, padding=0)
+            c = th.nn.functional.conv1d(x, self.K, stride=self.stride, padding=0)
             # N x C x 2F x T
             c = c.reshape(N, C, -1, c.shape[-1])
             # c = c.view(N, C, -1, c.shape[-1])
