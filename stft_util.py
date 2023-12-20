@@ -137,9 +137,10 @@ def init_kernel(frame_len, frame_hop):
     if N//4 == frame_hop:
         const = (2/3)**0.5       
         W = const*W
+        S =  0.5**(2/3) * (N * N / frame_hop)**0.5
     elif N//2 == frame_hop:
         W = W**0.5
-    S = 0.5 * (N * N / frame_hop)**0.5
+        S = 0.5 * (N * N / frame_hop)**0.5
 
     # K = th.rfft(th.eye(N) / S, 1)[:frame_len]
     K = th.fft.rfft(th.eye(N) / S, dim=1)[:frame_len]
@@ -149,3 +150,18 @@ def init_kernel(frame_len, frame_hop):
     # N+2 x 1 x F
     K = th.reshape(K, (N + 2, 1, frame_len))
     return K
+
+def IPD(spec_ref, spec, cos_sin_opt=False):
+    ipd = th.angle(spec) - th.angle(spec_ref)
+    yr = th.cos(ipd)
+    yi = th.sin(ipd)
+    yrm = yr.mean(1, keepdims=True)
+    yim = yi.mean(1, keepdims=True)
+    
+    if cos_sin_opt:
+        return th.cat([yi - yim, yr - yrm], dim=-1)
+    else:
+        return th.atan2(yi - yim, yr - yrm)
+    
+    
+    

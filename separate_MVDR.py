@@ -11,51 +11,20 @@ import librosa as audio_lib
 import numpy as np
 import torch as th
 import scipy.io as sio
-from model_RNN import PITNet
-from Conv_TasNet import ConvTasNet
-from conformer import ConformerCSS
-from Uconformer import U_ConformerCSS
-from Uconformer_v5 import U_ConformerCSS_v5
-from Uconformer_v7 import U_ConformerCSS_v7
-from Uconformer_v14 import U_ConformerCSS_v14
-from Uconformer_v15 import U_ConformerCSS_v15
-from Uconformer_v16 import U_ConformerCSS_v16
-from Uconformer_v18 import U_ConformerCSS_v18
-from Uconformer_v19 import U_ConformerCSS_v19
-from Uconformer_v20 import U_ConformerCSS_v20
-from Uconformer_v21 import U_ConformerCSS_v21
-from Uconformer_v22 import U_ConformerCSS_v22
-from Uconformer_v23 import U_ConformerCSS_v23
-from Uconformer_v23_2 import U_ConformerCSS_v23_2
-from Uconformer_v23_5 import U_ConformerCSS_v23_5
-from Uconformer_v23_6 import U_ConformerCSS_v23_6
-from Uconformer_v23_8 import U_ConformerCSS_v23_8
-from Uconformer_v23_9 import U_ConformerCSS_v23_9
-from Uconformer_v25 import U_ConformerCSS_v25
-from Uconformer_v25_2 import U_ConformerCSS_v25_2
-from Uconformer_v24_1 import U_ConformerCSS_v24_1
-from Uconformer_v24_2 import U_ConformerCSS_v24_2
-from Uconformer_v24_3 import U_ConformerCSS_v24_3
-from Uconformer_v24_7 import U_ConformerCSS_v24_7
-from Uconformer_v24_5 import U_ConformerCSS_v24_5
-from Uconformer_v27 import U_ConformerCSS_v27
-from Uconformer_v29 import U_ConformerCSS_v29
-from Uconformer_v30 import U_ConformerCSS_v30
-from Uconformer_v31 import U_ConformerCSS_v31
-from Uconformer_v32 import U_ConformerCSS_v32
-from Uconformer_v33 import U_ConformerCSS_v33
-from conformer_late_fusion_v3 import ConformerCSS_late_fusion_v3
+from model.conformer import ConformerCSS
+import soundfile as sf
+import scipy.io.wavfile as wf
 
 import scipy
 from itertools import permutations
 import copy
 from MVDR import MVDR
 
-from utils import stft, istft, parse_scps, apply_cmvn, parse_yaml, EPSILON
+from utils import stft, istft, parse_scps, parse_yaml, EPSILON
 
 
 class Separator(object):
-    def __init__(self, nnet, state_dict, crm, cuda=False, gpu_id=0):
+    def __init__(self, nnet, state_dict, cuda=False, gpu_id=0):
         if not os.path.exists(state_dict):
             raise RuntimeError(
                 "Could not find state file {}".format(state_dict))
@@ -66,13 +35,12 @@ class Separator(object):
         self.location = "cuda:"+str(gpu_id) if cuda else "cpu"
         # self.nnet.load_state_dict(th.load(state_dict, map_location=self.location))
         self.nnet.load_state_dict(th.load(state_dict, map_location=self.location)['model_state_dict'])
-        self.crm = crm
         # self.nnet.load_state_dict(
         #     th.load(state_dict, map_location=self.location))
         self.nnet.eval()
         self.mvdr = MVDR(ref_channel=0, diag_eps=1.0e-15, device=self.device)
 
-    def seperate(self, spectra, angle_diff=None, mvn=None, apply_log=True, cos_sin_opt=True):
+    def seperate(self, spectra, mvn=None, apply_log=True, cos_sin_opt=False):
         """
             spectra: stft complex results T x F
             cmvn: python dict contains global mean/std
@@ -83,12 +51,7 @@ class Separator(object):
         # compute (log)-magnitude spectrogram
         if len(spectra.shape) == 3:
             mix_feat = apply_cmvn(spectra[:,:,0]) if mvn else spectra[:,:,0]
-            if self.crm: 
-                mix_feat = np.concatenate((np.real(mix_feat), np.imag(mix_feat)),axis=1)
-            else:
-                mix_feat = np.abs(mix_feat)                
-            if apply_log:
-                mix_feat = np.log(np.maximum(mix_feat, EPSILON))
+            mix_feat = np.abs(mix_feat)                
             for i in range(1,spectra.shape[-1]):
                 IPD = np.angle(spectra[:,:,i]) - np.angle(spectra[:,:,0])
                 yr = np.cos(IPD)
@@ -96,43 +59,46 @@ class Separator(object):
                 yrm = yr.mean(0, keepdims=True)
                 yim = yi.mean(0, keepdims=True)
                 if cos_sin_opt:
-                    IPD = np.concatenate((yi - yim, yr - yrm), axis=1)
+                    IPD = np.concatenate((yi - yim, yr - yrm), axis=-1)
                 else:
                     IPD = np.arctan2(yi - yim, yr - yrm)
-                mix_feat = np.concatenate((mix_feat, IPD), axis=1)
+                mix_feat = np.concatenate((mix_feat, IPD), axis=-1)
             mix_feat = mix_feat.astype(np.float32)
         else:
             mix_feat = apply_cmvn(spectra) if mvn else spectra
-            if self.crm: 
-                mix_feat = np.concatenate((np.real(mix_feat), np.imag(mix_feat)),axis=1)
-            else:
-                mix_feat = np.abs(mix_feat)                            
-            if apply_log: mix_feat = np.log(np.maximum(mix_feat, EPSILON))
+            mix_feat = np.abs(mix_feat)                
+            # if apply_log: mix_feat = np.log(np.maximum(mix_feat, EPSILON))
 
         with th.no_grad():
             out_masks = self.nnet(
-                th.tensor(mix_feat, dtype=th.float32, device=self.device),
-                angle_diff if angle_diff == None else th.tensor(angle_diff, dtype=th.float32, device=self.device),
-                train=False)
+                th.tensor(mix_feat, dtype=th.float32, device=self.device), train=False)
             # th.cuda.empty_cache() # personal edit
             # out_masks = self.nnet(
             #     th.tensor(mix_feat, dtype=th.float32, device=self.device),
             #     train=False)
-        if self.crm:
-            out_masks = [th.chunk(m,2,2) for m in out_masks]
-            out_masks = [th.complex(m[0], m[1]) for m in out_masks]
         # spk_masks = [spk_mask.cpu().data.numpy() for spk_mask in out_masks]
         # spk_masks = [np.transpose(spk_mask.cpu().data.numpy()) for spk_mask in out_masks]
         spk_masks = [th.clamp(th.squeeze(th.transpose(spk_mask,0,-1)),min=EPSILON) for spk_mask in out_masks]
         # spk_masks = np.squeeze(spk_masks)
         # spk_masks = np.maximum(spk_masks, EPSILON)
-        spk_mvdr = [th.transpose(self.mvdr(
-                                th.transpose(th.tensor(spectra),-1, 0).to(self.device),
-                                mask=th.transpose(th.tensor(spk_mask),-1,0)
-                            ),0,1).cpu().data.numpy()
-                            for spk_mask in spk_masks]
-        return spk_masks, [spectra[:,:,0] * spk_mask.cpu().data.numpy() for spk_mask in spk_masks], spk_mvdr
+        if len(spectra.shape) == 3:
+            spk_mvdr = [th.transpose(self.mvdr(
+                                    th.transpose(th.tensor(spectra),-1, 0).to(self.device),
+                                    mask=th.transpose(th.tensor(spk_mask),-1,0)
+                                ),0,1).cpu().data.numpy()
+                                for spk_mask in spk_masks]
+            spk_masks=th.stack(spk_masks,dim=0).cpu().data.numpy()
+            return spk_masks, [spectra[:,:,0] * spk_mask for spk_mask in spk_masks], spk_mvdr
+        else:
+            spk_masks=th.stack(spk_masks,dim=0).cpu().data.numpy()
+            return spk_masks, [spectra * spk_mask for spk_mask in spk_masks] 
     
+def apply_cmvn(feats):
+    feats = feats - feats.mean(0, keepdims=True)
+    feats = feats / feats.std(0, keepdims=True)
+    return feats
+
+
 def CSS_chunk_generator(CSS_config, stft_mat, frame_shift):
     chunk_len = int((CSS_config["N_h"] + CSS_config["N_c"] + CSS_config["N_f"]) * 16000 / frame_shift)
     chunk_shift = int(CSS_config["N_c"] * 16000 / frame_shift)
@@ -173,94 +139,13 @@ def run(args):
     spectrogram_conf = config_dict["spectrogram_reader"]
     # Load cmvn
     # default: True
-    apply_log = dataloader_conf[
-        "apply_log"] if "apply_log" in dataloader_conf else True
-    if config_dict["model_type"] == "TasNet":
-        nnet = ConvTasNet(**config_dict["model"])
-    elif config_dict["model_type"] == "RNN":
-        nnet = PITNet(num_bins, **config_dict["model"])
-    elif config_dict["model_type"] == "Conformer":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
+    IPD_sincos = config_dict["trainer"]["IPD_sincos"]
+    config_dict["model"]["IPD_sincos"] = IPD_sincos
+    apply_log = dataloader_conf["apply_log"] if "apply_log" in dataloader_conf else True
+    if config_dict["model_type"] == "Conformer":
         nnet = ConformerCSS(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v21":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v21(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v23_2":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v23_2(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v23_5":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v23_5(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v23_6":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v23_6(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v23_8":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v23_8(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v23_9":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v23_9(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v24":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v24(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v29":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v29(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v25_2":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v25_2(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v24_5":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v24_5(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v24_2":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v24_2(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v24_7":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v24_7(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v27":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v27(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v30":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v30(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v31":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v31(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v32":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v32(**config_dict["model"])
-    elif config_dict["model_type"] == "U_Conformer_v33":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = U_ConformerCSS_v33(**config_dict["model"])
-    elif config_dict["model_type"] == "Conformer_late_fusion_v3":
-        config_dict["model"]["crm"] = config_dict['crm']
-        config_dict["model"]["IPD_sincos"] = dataloader_conf['IPD_sincos']
-        nnet = ConformerCSS_late_fusion_v3(**config_dict["model"])
 
-    CSS_config = config_dict["CSS_conf"]
+    CSS_config = config_dict["inference"]["CSS_conf"]
     frame_length = spectrogram_conf["frame_length"]
     frame_shift = spectrogram_conf["frame_shift"]
     # window = spectrogram_conf["window"]
@@ -271,13 +156,18 @@ def run(args):
     elif frame_length//2 == frame_shift:
         window = window**0.5
     
-    separator = Separator(nnet, config_dict["check_point_dir"], config_dict["crm"], cuda=args.cuda, gpu_id=args.gpu_id)
+    separator = Separator(nnet, config_dict["inference"]["check_point_dir"], cuda=args.cuda, gpu_id=args.gpu_id)
     
     utt_dict = parse_scps(args.wave_scp)
     num_utts = 0
     for key, utt in utt_dict.items():
         try:
-            samps_in,_ = audio_lib.load(utt, sr=None,mono=False)
+            if config_dict["model"]["num_mics"] == 1:
+                samps_in,_ = audio_lib.load(utt, sr=None,mono=True)
+            else:
+                samps_in,_ = audio_lib.load(utt, sr=None,mono=False)
+            samps_factor = 50
+            samps_in = samps_in * samps_factor
             samps, stft_mat = stft(
                 samps_in,
                 frame_length=frame_length,
@@ -291,7 +181,7 @@ def run(args):
         print("Processing utterance {}".format(key))
         num_utts += 1
         # norm = np.linalg.norm(samps, np.inf)
-        mvn = dataloader_conf["mvn"]
+        mvn = config_dict["trainer"]["mvn"]
         if CSS_config["CSS"]:
             (chunk_list, chunk_shift, N_h, 
              dummy_frame_len, stft_mat_pad) = CSS_chunk_generator(CSS_config, stft_mat, frame_shift)
@@ -300,7 +190,7 @@ def run(args):
             for idx, (whole_begin, whole_end) in enumerate(chunk_list):
                 stft_mat_chunk = stft_mat_pad[whole_begin:whole_end,:,:]
                 spk_mask, spk_spect, spk_mvdr = separator.seperate(
-                    stft_mat_chunk, mvn=mvn, apply_log=apply_log, cos_sin_opt=dataloader_conf['IPD_sincos'])
+                    stft_mat_chunk, mvn=mvn, apply_log=apply_log)
                 if idx == 0:
                     pre_spk_mask_chunk = spk_mask[:,chunk_shift:]
                     spk_mask_chunk = copy.deepcopy(spk_mask[:,N_h:N_h+chunk_shift])
@@ -331,32 +221,47 @@ def run(args):
             mask_mean = [np.convolve(mask_mean[i], np.ones(50)/50, mode='same') for i in range(2)]
             spk_mvdr_out = [spk_mvdr_out[i]*mask_mean[i][...,None] for i in range(2)]
         else:
-            spk_mask, spk_spect_out, spk_mvdr_out = separator.seperate(
-                stft_mat, mvn=mvn, apply_log=apply_log, cos_sin_opt=dataloader_conf['IPD_sincos'])
+            if len(stft_mat.shape) == 3:
+                spk_mask, spk_spect_out, spk_mvdr_out = separator.seperate(
+                    stft_mat, mvn=mvn, apply_log=apply_log, cos_sin_opt=IPD_sincos)
+            else:
+                spk_mask, spk_spect_out = separator.seperate(
+                    stft_mat, mvn=mvn, apply_log=apply_log)
+                spk_mvdr_out = None
 
         for index, stft_mat in enumerate(spk_spect_out):
-            istft(
-                os.path.join(args.dump_dir,'wav', '{}_{}.wav'.format(
-                    key[:-4], index)),
+            samps_out = istft(
                 stft_mat,
                 frame_length=frame_length,
                 frame_shift=frame_shift,
                 window=window,
                 center=True,
-                norm=config_dict["save_conf"]["wav_norm"],
+                norm=config_dict["inference"]["save_conf"]["wav_norm"],
                 fs=16000,
                 nsamps=samps.shape[-1])
-            istft(
-                os.path.join(args.dump_dir,'mvdr', '{}_{}.wav'.format(
-                    key[:-4], index)),
-                spk_mvdr_out[index],
-                frame_length=frame_length,
-                frame_shift=frame_shift,
-                window=window,
-                center=True,
-                norm=config_dict["save_conf"]["wav_norm"],
-                fs=16000,
-                nsamps=samps.shape[-1])
+            file = os.path.join(args.dump_dir,'wav', '{}_{}.wav'.format(key[:-4], index))
+            fdir = os.path.dirname(file)
+            if fdir and not os.path.exists(fdir):
+                os.makedirs(fdir)
+            # sf.write(file, samps_out, 16000)
+            wf.write(file, 16000, samps_out / samps_factor)
+            # sf.write(file, samps_out / samps_factor, 16000)
+            if spk_mvdr_out:
+                samps_out = istft(spk_mvdr_out[index],
+                    frame_length=frame_length,
+                    frame_shift=frame_shift,
+                    window=window,
+                    center=True,
+                    norm=config_dict["inference"]["save_conf"]["wav_norm"],
+                    fs=16000,
+                    nsamps=samps.shape[-1])
+                file = os.path.join(args.dump_dir,'mvdr', '{}_{}.wav'.format(key[:-4], index))
+                fdir = os.path.dirname(file)
+                if fdir and not os.path.exists(fdir):
+                    os.makedirs(fdir)
+                # sf.write(file, samps_out, 16000)
+                wf.write(file, 16000, samps_out / samps_factor)
+                # sf.write(file, samps_out / samps_factor, 16000)
             if args.dump_mask:
                 if CSS_config["CSS"]:
                     file_concat = os.path.join(args.dump_dir,'mask_concat','{}_{}.mat'.format(key[:-4], index))

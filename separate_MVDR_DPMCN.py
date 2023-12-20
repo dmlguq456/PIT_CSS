@@ -15,8 +15,10 @@ import scipy.io as sio
 import soundfile as sf
 
 from model.DPMCN_v15 import DPMCN_v15
+from model.DPMCN_v16 import DPMCN_v16
 from model.DPMCN_v15_NBF import DPMCN_v15_NBF
 
+import scipy.io.wavfile as wf
 
 import scipy
 from itertools import permutations
@@ -90,14 +92,11 @@ class Separator(object):
             if apply_log: mix_feat = np.log(np.maximum(mix_feat, EPSILON))
 
         with th.no_grad():
-            if spectra.shape[0] > 2000:
-                self.nnet = self.nnet.to(th.device("cpu"))
+            self.nnet = self.nnet.to(self.device) if spectra.shape[0] <= 1500  else self.nnet.to(th.device("cpu"))
             out_masks = self.nnet(
-                th.tensor(mix_feat, dtype=th.float32, device=(self.device if spectra.shape[0] <= 2000 else th.device("cpu"))),
+                th.tensor(mix_feat, dtype=th.float32, device=(self.device if spectra.shape[0] <= 1500 else th.device("cpu"))),
                 angle_diff if angle_diff == None else th.tensor(angle_diff, dtype=th.float32, device=self.device),
                 train=False)
-            if spectra.shape[0] > 2000:
-                self.nnet = self.nnet.to(self.device)
             
             out_masks = [out_mask.to(self.device) for out_mask in out_masks]
             # th.cuda.empty_cache() # personal edit
@@ -118,7 +117,7 @@ class Separator(object):
                             ),0,1).cpu().data.numpy()
                             for spk_mask in spk_masks]
         spk_masks=th.stack(spk_masks,dim=0).cpu().data.numpy()
-        spk_mvdr = [y * spk_masks[idx]**0.5 for idx, y in enumerate(spk_mvdr)]
+        # spk_mvdr = [y * spk_masks[idx]**0.5 for idx, y in enumerate(spk_mvdr)]
         return spk_masks, [spectra[:,:,0] * spk_mask for spk_mask in spk_masks], spk_mvdr
     
 def CSS_chunk_generator(CSS_config, stft_mat, frame_shift):
@@ -169,6 +168,9 @@ def run(args):
     elif config_dict["model_type"] == "DPMCN_v15":
         config_dict["model"]["crm"] = config_dict['crm']
         nnet = DPMCN_v15(**config_dict["model"])
+    elif config_dict["model_type"] == "DPMCN_v16":
+        config_dict["model"]["crm"] = config_dict['crm']
+        nnet = DPMCN_v16(**config_dict["model"])
 
 
     CSS_config = config_dict["inference"]["CSS_conf"]
@@ -190,7 +192,7 @@ def run(args):
         try:
             samps_in,_ = audio_lib.load(utt, sr=None,mono=False)
             samps_in = samps_in - samps_in.mean(-1, keepdims=True)
-            samps_factor = 50
+            samps_factor = 10
             # samps_factor = 1.0 / max(abs(samps_in[0]))
 
             # print(samps_factor)
@@ -268,7 +270,8 @@ def run(args):
             if fdir and not os.path.exists(fdir):
                 os.makedirs(fdir)
             # sf.write(file, samps_out, 16000)
-            sf.write(file, samps_out / samps_factor, 16000)
+            wf.write(file, 16000, samps_out / samps_factor)
+            # sf.write(file, 10 * samps_out / samps_factor, 16000)
             samps_out = istft(spk_mvdr_out[index],
                 frame_length=frame_length,
                 frame_shift=frame_shift,
@@ -282,7 +285,8 @@ def run(args):
             if fdir and not os.path.exists(fdir):
                 os.makedirs(fdir)
             # sf.write(file, samps_out, 16000)
-            sf.write(file, samps_out / samps_factor, 16000)
+            wf.write(file, 16000, samps_out / samps_factor)
+            # sf.write(file, 10 * samps_out / samps_factor, 16000)
             if args.dump_mask:
                 if CSS_config["CSS"]:
                     file_concat = os.path.join(args.dump_dir,'mask_concat','{}_{}.mat'.format(key[:-4], index))
