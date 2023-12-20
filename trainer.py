@@ -158,12 +158,6 @@ class PITrainer(object):
         self.stft = STFT(stft_config["frame_length"],stft_config["frame_shift"],stft_config["window"], device=self.device)
         self.inverse_stft = iSTFT(stft_config["frame_length"], stft_config["frame_shift"], stft_config["window"], device=self.device)
         self.angle_feature_opt = angle_feature_opt
-        if self.angle_feature_opt:
-            self.ang_extractor = AngleFeature(
-                num_bins=stft_config["frame_length"]/2+1,
-                num_doas=self.num_spks,  # must known the DoA
-                device=self.device
-                )
 
         # self.RT_list = rir_config["RT_list"]
         # self.rir_dir = rir_config["rir_dir"]
