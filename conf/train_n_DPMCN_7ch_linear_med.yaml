@@ -1,7 +1,9 @@
 # config for training
 
 trainer:
-  checkpoint: "./model_pickle/DPMCN/7ch_v15_NBF_early256"
+  checkpoint: "./model_pickle/DPMCN_re/7ch_linear_Sigmoid_med"
+  # checkpoint: "./model_pickle/DPMCN/7ch_v15_ReLU_noise"
+  # checkpoint: "./model_pickle/DPMCN/7ch_v15"
   # checkpoint: "./model_pickle/UConformer_PIT/7ch_v16_SASDR_IPD_Large_Libri"
   # checkpoint: "./model_pickle/Conformer_PIT/7ch_v60_SISNR_SA_sincosIPD"
   optimizer: "adamW"
@@ -22,12 +24,11 @@ trainer:
 
 MVDR: false
 
-model_type: "DPMCN_v15_NBF"
+model_type: "DPMCN_v17"
 
-# rir_conf:
-# RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
-RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]
-rir_dir: "./RIR_filter_v9"
+rir_conf:
+  RT_list: [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+  rir_dir: "./RIR_filter_v9"
 # noise_dir: "/home/nas/user/Uihyeop/DB/wsj0-mix/2speakers/wav16k/colorednoise_v9/"
 noise_dir: "/home/work/data_Uihyeop/data/colorednoise_v9_short/"
 # noise_dir: "/home/work/data_Uihyeop/data/Reverb_air_noise/NOISE_seg_7ch/"
@@ -37,21 +38,26 @@ crm : false
 
 model:
   noise_flag: false
+  # noise_flag: true
   in_features: 257
   num_mics : 7
   num_spks: 2
   conformer_conf:
     attention_dim_F: 128
-    attention_dim_C: 64
+    attention_dim_C: 32
     attention_heads_F: 4
     attention_heads_C: 2
     dropout_rate: 0.05
     kernel_size: 33
     linear_units_F: 512
-    linear_units_C: 256
-    N_intra : 2
+    linear_units_C: 128
+    N_intra : 3
     N_inter : 1
     N_repeat : 4
+    GRN_opt: true
+    pooling_ratio: 4
+    beta : 'vector' # vector, scalar, fixed_mag, fixed_no
+    mask_activation : 'Sigmoid' # ReLU, Sigmoid
 
 spectrogram_reader:
   frame_shift: 256
@@ -82,16 +88,28 @@ valid_scp_conf:
   spk1: "scp_css_v3_segment/cv_s1.scp"
   spk2: "scp_css_v3_segment/cv_s2.scp"
 
+test_scp_conf:
+  mixture: "scp_css_v3_segment/tt_mix.scp"
+  spk1: "scp_css_v3_segment/tt_s1.scp"
+  spk2: "scp_css_v3_segment/tt_s2.scp"
 
-debug_scp_conf:
-  mixture: "./data/tune/mix.scp"
-  spk1: "./data/tune/spk1.scp"
-  spk2: "./data/tune/spk2.scp"
 
 dataloader:
   shuffle: true
-  batch_size: 6
+  batch_size: 10
   drop_last: false
-  num_workers: 5
+  num_workers: 10
   max_frame : 700
 
+inference:
+  check_point_dir: "./model_pickle/DPMCN_v15/epoch.112.pkl"
+  save_conf:
+    wav_norm: false
+  CSS_conf:
+    CSS: false
+    # N_h: 3.6
+    # N_c: 2.4
+    # N_f: 1.2
+    N_h: 1.2
+    N_c: 0.8
+    N_f: 0.4

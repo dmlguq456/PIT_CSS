@@ -10,6 +10,7 @@ from dataset_RI import SpectrogramReader, Datasets
 
 from model.DPMCN_v15 import DPMCN_v15
 from model.DPMCN_v16 import DPMCN_v16
+from model.DPMCN_v17 import DPMCN_v17
 # from model.DPMCN_v15_NBF import DPMCN_v15_NBF
 
 from utils import nfft, parse_yaml, get_logger
@@ -151,6 +152,8 @@ def train(args):
         nnet = DPMCN_v15(**dcnnet_conf)
     elif config_dict["model_type"] == "DPMCN_v16":
         nnet = DPMCN_v16(**dcnnet_conf)
+    elif config_dict["model_type"] == "DPMCN_v17":
+        nnet = DPMCN_v17(**dcnnet_conf)
     elif config_dict["model_type"] == "DPMCN_v15_small_embed":
         nnet = DPMCN_v15_small_embed(**dcnnet_conf)
     elif config_dict["model_type"] == "DPMCN_v15_NBF":

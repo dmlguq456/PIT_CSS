@@ -160,6 +160,9 @@ class SpectrogramReader(object):
             if self.num_mics == 1:
                 samps_tmp_rir = ss.convolve(samps_tmp[:,None], h[idx][:,0].reshape(-1,1), mode='full')
                 samps_src_rir.append(samps_tmp_rir[:samps_tmp.shape[0],0])
+            elif self.num_mics == 3:
+                samps_tmp_rir = ss.convolve(samps_tmp[:,None], h[idx][:,[0,1,4]], mode='full')
+                samps_src_rir.append(samps_tmp_rir[:samps_tmp.shape[0],:])                
             else:
                 samps_tmp_rir = ss.convolve(samps_tmp[:,None], h[idx], mode='full')
                 samps_src_rir.append(samps_tmp_rir[:samps_tmp.shape[0],:])
@@ -186,6 +189,8 @@ class SpectrogramReader(object):
         norm_tmp = (np.std(samps_rir_mix) + 1.0e-6)/(np.std(noise) + 1.0e-6)
         if self.num_mics == 1:
             noise_SNR = noise[:samps_rir_mix.shape[0],0]*norm_tmp*pow(10,-SNR/20)
+        elif self.num_mics == 3:
+            noise_SNR = noise[:samps_rir_mix.shape[0],[0,1,4]]*norm_tmp*pow(10,-SNR/20)            
         else:
             noise_SNR = noise[:samps_rir_mix.shape[0],:]*norm_tmp*pow(10,-SNR/20)
         samps_fin = samps_rir_mix + noise_SNR
