@@ -15,3 +15,6 @@ RIR_filter_v9
 MLDR.py
 SMLDR.py
 model_pickle.tar
+.vscode
+.legacy
+

@@ -40,7 +40,7 @@ class Separator(object):
         self.nnet.eval()
         self.mvdr = MVDR(ref_channel=0, diag_eps=1.0e-15, device=self.device)
 
-    def seperate(self, spectra, mvn=None, apply_log=True, cos_sin_opt=False):
+    def seperate(self, spectra, mvn=None, apply_log=False, cos_sin_opt=False):
         """
             spectra: stft complex results T x F
             cmvn: python dict contains global mean/std
@@ -84,7 +84,8 @@ class Separator(object):
         if len(spectra.shape) == 3:
             spk_mvdr = [th.transpose(self.mvdr(
                                     th.transpose(th.tensor(spectra),-1, 0).to(self.device),
-                                    mask=th.transpose(th.tensor(spk_mask),-1,0)
+                                    mask=th.transpose(th.tensor(spk_mask),-1,0),
+                                    PF_beta=0.5
                                 ),0,1).cpu().data.numpy()
                                 for spk_mask in spk_masks]
             spk_masks=th.stack(spk_masks,dim=0).cpu().data.numpy()
@@ -166,7 +167,7 @@ def run(args):
                 samps_in,_ = audio_lib.load(utt, sr=None,mono=True)
             else:
                 samps_in,_ = audio_lib.load(utt, sr=None,mono=False)
-            samps_factor = 50
+            samps_factor = 10
             samps_in = samps_in * samps_factor
             samps, stft_mat = stft(
                 samps_in,

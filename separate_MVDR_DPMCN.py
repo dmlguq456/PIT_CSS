@@ -16,6 +16,7 @@ import soundfile as sf
 
 from model.DPMCN_v15 import DPMCN_v15
 from model.DPMCN_v16 import DPMCN_v16
+from model.DPMCN_v17 import DPMCN_v17
 from model.DPMCN_v15_NBF import DPMCN_v15_NBF
 
 import scipy.io.wavfile as wf
@@ -24,6 +25,7 @@ import scipy
 from itertools import permutations
 import copy
 from MVDR import MVDR
+from MWF import MWF
 
 from utils import stft, istft, parse_scps, parse_yaml, EPSILON
 
@@ -44,12 +46,12 @@ class Separator(object):
         # self.nnet.load_state_dict(
         #     th.load(state_dict, map_location=self.location))
         self.nnet.eval()
+        # self.mvdr = MWF(ref_channel=0, diag_eps=1.0e-15, device=self.device)
         self.mvdr = MVDR(ref_channel=0, diag_eps=1.0e-15, device=self.device)
-        # self.mvdr = SMLDR(ref_channel=0, diag_eps=1.0e-15, device=self.device)
 
 
 
-    def seperate(self, spectra, angle_diff=None, mvn=None, apply_log=True, cos_sin_opt=True):
+    def seperate(self, spectra):
         """
             spectra: stft complex results T x F
             cmvn: python dict contains global mean/std
@@ -64,38 +66,20 @@ class Separator(object):
             raise ValueError("Input must be matrix in complex value")
         # compute (log)-magnitude spectrogram
         if len(spectra.shape) == 3:
-            # mix_feat = apply_cmvn(spectra[:,:,0]) if mvn else spectra[:,:,0]
             mix_feat = np.concatenate((np.real(spectra), np.imag(spectra)),axis=-1) # [ B, T, F, M*2]
-            # print(mix_feat.shape)
-                # mix_feat = np.concatenate((np.real(mix_feat), np.imag(mix_feat)),axis=1)
-            # if apply_log:
-            #     mix_feat = np.log(np.maximum(mix_feat, EPSILON))
-            # for i in range(1,spectra.shape[-1]):
-            #     IPD = np.angle(spectra[:,:,i]) - np.angle(spectra[:,:,0])
-            #     yr = np.cos(IPD)
-            #     yi = np.sin(IPD)
-            #     yrm = yr.mean(0, keepdims=True)
-            #     yim = yi.mean(0, keepdims=True)
-            #     if cos_sin_opt:
-            #         IPD = np.concatenate((yi - yim, yr - yrm), axis=1)
-            #     else:
-            #         IPD = np.arctan2(yi - yim, yr - yrm)
-            #     mix_feat = np.concatenate((mix_feat, IPD), axis=1)
             mix_feat = mix_feat.astype(np.float32)
         else:
-            mix_feat = apply_cmvn(spectra) if mvn else spectra
+            mix_feat = spectra
             if self.crm: 
                 mix_feat = np.concatenate((np.real(mix_feat), np.imag(mix_feat)),axis=1)
             else:
                 mix_feat = np.concatenate((np.real(mix_feat), np.imag(mix_feat)),axis=1)
                 # mix_feat = np.abs(mix_feat)                              
-            if apply_log: mix_feat = np.log(np.maximum(mix_feat, EPSILON))
 
         with th.no_grad():
             self.nnet = self.nnet.to(self.device) if spectra.shape[0] <= 1500  else self.nnet.to(th.device("cpu"))
             out_masks = self.nnet(
                 th.tensor(mix_feat, dtype=th.float32, device=(self.device if spectra.shape[0] <= 1500 else th.device("cpu"))),
-                angle_diff if angle_diff == None else th.tensor(angle_diff, dtype=th.float32, device=self.device),
                 train=False)
             
             out_masks = [out_mask.to(self.device) for out_mask in out_masks]
@@ -113,7 +97,8 @@ class Separator(object):
         # spk_masks = np.maximum(spk_masks, EPSILON)
         spk_mvdr = [th.transpose(self.mvdr(
                                 th.transpose(th.tensor(spectra),-1, 0).to(self.device),
-                                mask=th.transpose(th.tensor(spk_mask),-1,0)
+                                mask=th.transpose(th.tensor(spk_mask),-1,0),
+                                PF_beta=0.5
                             ),0,1).cpu().data.numpy()
                             for spk_mask in spk_masks]
         spk_masks=th.stack(spk_masks,dim=0).cpu().data.numpy()
@@ -171,6 +156,9 @@ def run(args):
     elif config_dict["model_type"] == "DPMCN_v16":
         config_dict["model"]["crm"] = config_dict['crm']
         nnet = DPMCN_v16(**config_dict["model"])
+    elif config_dict["model_type"] == "DPMCN_v17":
+        config_dict["model"]["crm"] = config_dict['crm']
+        nnet = DPMCN_v17(**config_dict["model"])
 
 
     CSS_config = config_dict["inference"]["CSS_conf"]
@@ -191,7 +179,7 @@ def run(args):
     for key, utt in utt_dict.items():
         try:
             samps_in,_ = audio_lib.load(utt, sr=None,mono=False)
-            samps_in = samps_in - samps_in.mean(-1, keepdims=True)
+            # samps_in = samps_in - samps_in.mean(-1, keepdims=True)
             samps_factor = 10
             # samps_factor = 1.0 / max(abs(samps_in[0]))
 
@@ -252,8 +240,7 @@ def run(args):
             mask_mean = [np.convolve(mask_mean[i], np.ones(50)/50, mode='same') for i in range(2)]
             spk_mvdr_out = [spk_mvdr_out[i]*mask_mean[i][...,None] for i in range(2)]
         else:
-            spk_mask, spk_spect_out, spk_mvdr_out = separator.seperate(
-                stft_mat, mvn=mvn, apply_log=apply_log, cos_sin_opt=config_dict['trainer']['IPD_sincos'])
+            spk_mask, spk_spect_out, spk_mvdr_out = separator.seperate(stft_mat)
 
         for index, stft_mat in enumerate(spk_spect_out):
             samps_out = istft(
@@ -271,7 +258,7 @@ def run(args):
                 os.makedirs(fdir)
             # sf.write(file, samps_out, 16000)
             wf.write(file, 16000, samps_out / samps_factor)
-            # sf.write(file, 10 * samps_out / samps_factor, 16000)
+            # sf.write(file,  samps_out / samps_factor, 16000)
             samps_out = istft(spk_mvdr_out[index],
                 frame_length=frame_length,
                 frame_shift=frame_shift,
@@ -286,7 +273,7 @@ def run(args):
                 os.makedirs(fdir)
             # sf.write(file, samps_out, 16000)
             wf.write(file, 16000, samps_out / samps_factor)
-            # sf.write(file, 10 * samps_out / samps_factor, 16000)
+            # sf.write(file, samps_out / samps_factor, 16000)
             if args.dump_mask:
                 if CSS_config["CSS"]:
                     file_concat = os.path.join(args.dump_dir,'mask_concat','{}_{}.mat'.format(key[:-4], index))
